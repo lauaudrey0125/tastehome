@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>TasteHome - 清真美食地图</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #f8f9fa;
+        }
+        header {
+            background: #2c7a4d;
+            color: white;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            height: 70px;
+        }
+        .lang-switch {
+            background: white;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-weight: 600;
+            color: #2c7a4d;
+            cursor: pointer;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+        main {
+            max-width: 1200px;
+            margin: 16px auto;
+            padding: 0 16px;
+        }
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .restaurant-card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .restaurant-card:hover {
+            background: #fef7e0;
+            transform: translateY(-2px);
+        }
+        .restaurant-name {
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: #1e3a2f;
+        }
+        .restaurant-address {
+            font-size: 0.85rem;
+            color: #5a6e5c;
+            margin-top: 6px;
+        }
+        .restaurant-meta {
+            font-size: 0.75rem;
+            color: #b86b2c;
+            margin-top: 8px;
+            display: inline-block;
+            background: #fef2e0;
+            padding: 4px 10px;
+            border-radius: 30px;
+        }
+        .unlock-btn {
+            background: #ffc107;
+            color: #1e3a2f;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 40px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 12px;
+            transition: 0.2s;
+        }
+        .unlock-btn:hover {
+            background: #ffb300;
+            transform: scale(1.01);
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        .modal-content {
+            background: white;
+            padding: 24px;
+            border-radius: 28px;
+            text-align: center;
+            max-width: 320px;
+            width: 85%;
+        }
+        .qr-box {
+            background: #f0f0f0;
+            margin: 20px auto;
+            padding: 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #555;
+        }
+        .qr-box img {
+            width: 100%;
+            height: auto;
+            border-radius: 12px;
+        }
+        .modal button {
+            background: #2c7a4d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 40px;
+            margin: 5px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .footer {
+            text-align: center;
+            margin: 30px 0 20px;
+            font-size: 12px;
+            color: #8b9a8b;
+        }
+        @media (max-width: 600px) {
+            #map {
+                height: 300px;
+            }
+            header {
+                height: 60px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <img src="logo-simple.png" alt="TasteHome" style="height: 100%; max-height: 60px; object-fit: contain;">
+    <button id="langBtn" class="lang-switch">中文</button>
+</header>
+
+<main>
+    <div id="map"></div>
+    <div id="restaurantList" style="margin-top: 8px;"></div>
+    <div id="unlockArea" style="display: none;"></div>
+</main>
+
+<div class="footer">
+    <p>📍 Tap any restaurant to see address | 点击餐厅查看详情</p>
+</div>
+
+<!-- 支付弹窗 -->
+<div id="paymentModal" class="modal">
+    <div class="modal-content">
+        <h3 id="modalTitle">Unlock All Restaurants</h3>
+        <p id="modalDesc">Pay ¥9.9 to get full access to all halal restaurants</p>
+        <div class="qr-box">
+            <div style="font-size: 12px; margin-bottom: 8px;">👇 扫码支付 ¥9.9 👇</div>
+            <img src="收款码.png" alt="Payment QR Code" style="width: 100%; border-radius: 12px;">
+            <div style="font-size: 11px; margin-top: 8px;">支付后点击下方按钮</div>
+        </div>
+        <button id="confirmPayBtn">✓ I have paid / 我已支付</button>
+        <button id="closeModalBtn" style="background:#ccc; color:#333;">Close</button>
+    </div>
+</div>
+
+<script>
+    // ==================== 餐厅数据（共6家）====================
+    const restaurantsData = [
+        {
+            name_cn: "兰州拉面（仓前店）",
+            name_en: "Lanzhou Noodles (Cangqian)",
+            lat: 30.28621,
+            lng: 120.019159,
+            address_cn: "余杭区仓前街道",
+            address_en: "Cangqian Street, Yuhang District",
+            certification_cn: "穆斯林经营",
+            certification_en: "Muslim-owned",
+            rating: 4.3
+        },
+        {
+            name_cn: "疆厨子·抓饭·烤肉",
+            name_en: "Jiang Kitchen - Rice & BBQ",
+            lat: 30.274897,
+            lng: 120.021742,
+            address_cn: "余杭区仓前街道",
+            address_en: "Cangqian Street, Yuhang District",
+            certification_cn: "清真认证",
+            certification_en: "Halal Certified",
+            rating: 4.5
+        },
+        {
+            name_cn: "SOUQ · 黎巴嫩烤肉(平安悦坊店)",
+            name_en: "SOUQ Lebanese BBQ",
+            lat: 30.251497,
+            lng: 120.212689,
+            address_cn: "平安悦坊",
+            address_en: "Ping'an Yuefang",
+            certification_cn: "清真认证",
+            certification_en: "Halal Certified",
+            rating: 4.4
+        },
+        {
+            name_cn: "Uncle Kosto科斯托·中东菜",
+            name_en: "Uncle Kosto Middle Eastern",
+            lat: 30.313583,
+            lng: 120.392775,
+            address_cn: "中东菜餐厅",
+            address_en: "Middle Eastern Restaurant",
+            certification_cn: "穆斯林经营",
+            certification_en: "Muslim-owned",
+            rating: 4.6
+        },
+        {
+            name_cn: "喀摩尔土耳其风味餐厅·中东美食·异域风情(中山中路店)",
+            name_en: "Kamoer Turkish Cuisine",
+            lat: 30.247915,
+            lng: 120.170652,
+            address_cn: "中山中路",
+            address_en: "Zhongshan Middle Road",
+            certification_cn: "清真认证",
+            certification_en: "Halal Certified",
+            rating: 4.5
+        },
+        {
+            name_cn: "halal迪拜土耳其清真餐厅·烧烤.宴会团建(西湖音乐喷泉店)",
+            name_en: "Halal Dubai Turkish BBQ",
+            lat: 30.257386,
+            lng: 120.159474,
+            address_cn: "西湖音乐喷泉",
+            address_en: "West Lake Music Fountain",
+            certification_cn: "清真认证",
+            certification_en: "Halal Certified",
+            rating: 4.7
+        }
+    ];
+
+    // 免费版只显示前3家，付费后显示全部
+    const allRestaurants = restaurantsData;
+
+    // ==================== 全局变量 ====================
+    let currentLang = 'en';
+    let map = null;
+    let markers = [];
+    let isPaidUser = false;   // 付费状态，初始为false
+
+    // ==================== 辅助函数 ====================
+    function getRestaurantName(r) {
+        return currentLang === 'en' ? r.name_en : r.name_cn;
+    }
+    function getRestaurantAddress(r) {
+        return currentLang === 'en' ? r.address_en : r.address_cn;
+    }
+    function getCertification(r) {
+        return currentLang === 'en' ? r.certification_en : r.certification_cn;
+    }
+
+    // 显示餐厅列表
+    function displayRestaurants() {
+        const container = document.getElementById('restaurantList');
+        const unlockContainer = document.getElementById('unlockArea');
+        if (!container) return;
+        container.innerHTML = '';
+        
+        const displayList = isPaidUser ? allRestaurants : allRestaurants.slice(0, 3);
+        
+        if (displayList.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#888;">No restaurants yet</p>';
+            return;
+        }
+        
+        displayList.forEach(rest => {
+            const card = document.createElement('div');
+            card.className = 'restaurant-card';
+            card.innerHTML = `
+                <div class="restaurant-name">${getRestaurantName(rest)} ⭐ ${rest.rating}</div>
+                <div class="restaurant-address">📍 ${getRestaurantAddress(rest)}</div>
+                <div class="restaurant-meta">✅ ${getCertification(rest)}</div>
+            `;
+            card.onclick = () => {
+                alert(`${getRestaurantName(rest)}\n📍 ${getRestaurantAddress(rest)}\n⭐ ${rest.rating}`);
+            };
+            container.appendChild(card);
+        });
+        
+        // 解锁按钮区域
+        if (!isPaidUser && allRestaurants.length > 3) {
+            unlockContainer.innerHTML = `<button class="unlock-btn" onclick="showPaymentModal()">
+                🔓 ${currentLang === 'en' ? 'Unlock All Restaurants (¥9.9)' : '解锁全部餐厅 (¥9.9)'}
+            </button>`;
+            unlockContainer.style.display = 'block';
+        } else {
+            unlockContainer.style.display = 'none';
+        }
+    }
+
+    // 更新地图标记
+    function updateMapMarkers() {
+        if (!map) return;
+        markers.forEach(marker => marker.setMap(null));
+        markers = [];
+        
+        const displayList = isPaidUser ? allRestaurants : allRestaurants.slice(0, 3);
+        displayList.forEach(rest => {
+            const marker = new AMap.Marker({
+                position: [rest.lng, rest.lat],
+                map: map,
+                title: getRestaurantName(rest),
+                offset: new AMap.Pixel(-12, -30)
+            });
+            marker.on('click', () => {
+                alert(`${getRestaurantName(rest)}\n📍 ${getRestaurantAddress(rest)}`);
+            });
+            markers.push(marker);
+        });
+        
+        if (markers.length > 0) {
+            map.setFitView(markers);
+        }
+    }
+
+    // 支付弹窗控制
+    function showPaymentModal() {
+        document.getElementById('paymentModal').style.display = 'flex';
+    }
+    function closeModal() {
+        document.getElementById('paymentModal').style.display = 'none';
+    }
+    function confirmPayment() {
+        isPaidUser = true;
+        closeModal();
+        displayRestaurants();
+        updateMapMarkers();
+        alert(currentLang === 'en' ? '✓ Payment confirmed! All restaurants unlocked.' : '✓ 支付已确认！已解锁全部餐厅。');
+    }
+
+    // 语言切换
+    function setLanguage(lang) {
+        currentLang = lang;
+        const langBtn = document.getElementById('langBtn');
+        langBtn.innerText = currentLang === 'en' ? '中文' : 'English';
+        document.getElementById('modalTitle').innerText = currentLang === 'en' ? 'Unlock All Restaurants' : '解锁全部餐厅';
+        document.getElementById('modalDesc').innerHTML = currentLang === 'en' 
+            ? 'Pay ¥9.9 to get full access to all halal restaurants' 
+            : '支付 ¥9.9 解锁全部清真餐厅';
+        displayRestaurants();
+        updateMapMarkers();
+    }
+
+    // 初始化高德地图
+    function initMap() {
+        // 地图中心：杭州师范大学仓前校区
+        const center = [120.016255, 30.292797];
+        map = new AMap.Map('map', {
+            zoom: 13,
+            center: center,
+            viewMode: '2D',
+            mapStyle: 'amap://styles/whitesmoke'
+        });
+        map.addControl(new AMap.Scale());
+        map.addControl(new AMap.ToolBar());
+        updateMapMarkers();
+    }
+
+    // 加载高德地图脚本
+    function loadAmapScript() {
+        // 你的高德Key
+        const apiKey = 'b0ed148e34bc74e1b2f77fbda7e2926d';
+        const script = document.createElement('script');
+        script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}&callback=initMap`;
+        script.async = true;
+        document.head.appendChild(script);
+    }
+
+    // 页面加载
+    window.onload = () => {
+        loadAmapScript();
+        displayRestaurants();
+        
+        document.getElementById('langBtn').onclick = () => setLanguage(currentLang === 'en' ? 'zh' : 'en');
+        document.getElementById('confirmPayBtn').onclick = confirmPayment;
+        document.getElementById('closeModalBtn').onclick = closeModal;
+        
+        window.onclick = (e) => {
+            const modal = document.getElementById('paymentModal');
+            if (e.target === modal) closeModal();
+        };
+    };
+</script>
+</body>
+</html>
