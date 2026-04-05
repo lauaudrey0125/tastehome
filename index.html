@@ -1,145 +1,217 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TasteHome - Halal Food Finder</title>
-
-<script src="https://webapi.amap.com/maps?v=2.0&key=b0ed148e34bc74e1b2f77fbda7e2926d"></script>
-
-<style>
-body { font-family: Arial; margin:0; background:#f8f9fa; }
-
-/* Header */
-header {
-    background:#2c7a4d;
-    color:white;
-    display:flex;
-    justify-content:space-between;
-    padding:10px 20px;
-}
-
-button { cursor:pointer; }
-
-/* Search */
-.search-bar {
-    margin:20px;
-    display:flex;
-    gap:10px;
-}
-
-.search-bar input {
-    flex:1;
-    padding:10px;
-    border-radius:20px;
-    border:1px solid #ccc;
-}
-
-/* Map */
-#map {
-    height:300px;
-    margin:20px;
-    border-radius:20px;
-}
-
-/* Card */
-.card {
-    background:white;
-    margin:15px;
-    padding:15px;
-    border-radius:15px;
-    box-shadow:0 2px 6px rgba(0,0,0,0.1);
-}
-
-.tag {
-    background:#fef2e0;
-    padding:5px 10px;
-    border-radius:20px;
-    display:inline-block;
-    margin-top:5px;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>TasteHome - 国际美食地图</title>
+    <script src="https://webapi.amap.com/maps?v=2.0&key=b0ed148e34bc74e1b2f77fbda7e2926d"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f8f9fa; }
+        header { background: #2c7a4d; color: white; display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; }
+        .logo { height: 50px; }
+        .lang-buttons button { background: white; border: none; padding: 6px 12px; margin-left: 8px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        .search-bar { margin: 20px; display: flex; gap: 10px; }
+        .search-bar input { flex: 1; padding: 10px; border-radius: 30px; border: 1px solid #ccc; }
+        .search-bar button { background: #2c7a4d; color: white; border: none; padding: 10px 20px; border-radius: 30px; cursor: pointer; }
+        #map { height: 350px; margin: 20px; border-radius: 20px; }
+        .card { background: white; margin: 15px; padding: 15px; border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .tag { background: #fef2e0; padding: 5px 12px; border-radius: 30px; display: inline-block; margin-top: 8px; font-size: 0.8rem; }
+        .unlock-container { margin: 20px; }
+        .unlock-btn { background: #ffc107; color: #1e3a2f; border: none; padding: 12px; border-radius: 40px; width: 100%; font-weight: bold; font-size: 1rem; cursor: pointer; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 24px; border-radius: 28px; text-align: center; max-width: 300px; width: 80%; }
+        .qr-img { width: 180px; margin: 16px auto; }
+        .qr-img img { width: 100%; border-radius: 12px; }
+        .modal button { background: #2c7a4d; color: white; border: none; padding: 8px 16px; border-radius: 30px; margin: 8px; cursor: pointer; }
+        footer { background: #f2f2f2; padding: 30px 20px 15px; margin-top: 40px; border-top: 1px solid #ddd; text-align: center; font-size: 0.8rem; color: #666; }
+        @media (max-width: 600px) { #map { height: 250px; } .logo { height: 40px; } }
+    </style>
 </head>
-
 <body>
 
 <header>
-    <h2>TasteHome 🕌</h2>
-    <div>
+    <img src="logo-simple.png" class="logo" alt="TasteHome">
+    <div class="lang-buttons">
         <button onclick="setLang('en')">EN</button>
-        <button onclick="setLang('zh')">中</button>
-        <button onclick="setLang('ar')">AR</button>
+        <button onclick="setLang('zh')">中文</button>
+        <button onclick="setLang('ar')">العربية</button>
     </div>
 </header>
 
 <div class="search-bar">
     <input id="searchInput" placeholder="Search halal food...">
-    <button onclick="search()">🔍</button>
+    <button onclick="searchRestaurants()">🔍</button>
 </div>
 
 <div id="map"></div>
 
 <div id="list"></div>
+<div class="unlock-container" id="unlockContainer"></div>
+
+<footer>
+    <p>© 2025 TasteHome International Food Map | Find your taste of home</p>
+    <p style="margin-top: 8px;">📍 Tap any restaurant to see details | 点击餐厅查看详情</p>
+</footer>
+
+<!-- 支付弹窗 -->
+<div id="paymentModal" class="modal">
+    <div class="modal-content">
+        <h3 id="modalTitle">Unlock All Restaurants</h3>
+        <p id="modalDesc">Pay ¥9.9 to get full access</p>
+        <div class="qr-img">
+            <img src="收款码.png" alt="Payment QR Code">
+        </div>
+        <button id="confirmPayBtn">✓ I have paid / 我已支付</button>
+        <button id="closeModalBtn">Cancel</button>
+    </div>
+</div>
 
 <script>
+    // 餐厅数据（6家）
+    const restaurantsData = [
+        { id:1, name_en:"Lanzhou Noodles", name_zh:"兰州拉面（仓前店）", name_ar:"لانزو نودلز", lat:30.28621, lng:120.019159, address_en:"Cangqian St", address_zh:"余杭区仓前街道", address_ar:"شارع تشانغتشيان", halal_en:"Muslim-owned", halal_zh:"穆斯林经营", halal_ar:"حلال مملوك للمسلمين", rating:4.3 },
+        { id:2, name_en:"Jiang Kitchen (Rice & BBQ)", name_zh:"疆厨子·抓饭·烤肉", name_ar:"مطبخ جيانغ", lat:30.274897, lng:120.021742, address_en:"Cangqian St", address_zh:"余杭区仓前街道", address_ar:"شارع تشانغتشيان", halal_en:"Halal Certified", halal_zh:"清真认证", halal_ar:"حلال معتمد", rating:4.5 },
+        { id:3, name_en:"SOUQ Lebanese BBQ", name_zh:"SOUQ·黎巴嫩烤肉", name_ar:"سوق شواء لبناني", lat:30.251497, lng:120.212689, address_en:"Ping'an Yuefang", address_zh:"平安悦坊", address_ar:"بينغ آن يويه فانغ", halal_en:"Halal Certified", halal_zh:"清真认证", halal_ar:"حلال معتمد", rating:4.4 },
+        { id:4, name_en:"Uncle Kosto Middle Eastern", name_zh:"Uncle Kosto中东菜", name_ar:"عم كوستو", lat:30.313583, lng:120.392775, address_en:"Middle Eastern Restaurant", address_zh:"中东菜餐厅", address_ar:"مطعم شرق أوسطي", halal_en:"Muslim-owned", halal_zh:"穆斯林经营", halal_ar:"حلال مملوك للمسلمين", rating:4.6 },
+        { id:5, name_en:"Kamoer Turkish Cuisine", name_zh:"喀摩尔土耳其餐厅", name_ar:"كاموير تركي", lat:30.247915, lng:120.170652, address_en:"Zhongshan Rd", address_zh:"中山中路", address_ar:"طريق تشونغشان", halal_en:"Halal Certified", halal_zh:"清真认证", halal_ar:"حلال معتمد", rating:4.5 },
+        { id:6, name_en:"Halal Dubai Turkish BBQ", name_zh:"halal迪拜土耳其餐厅", name_ar:"دبي تركي حلال", lat:30.257386, lng:120.159474, address_en:"West Lake Music Fountain", address_zh:"西湖音乐喷泉", address_ar:"نافورة ويست ليك", halal_en:"Halal Certified", halal_zh:"清真认证", halal_ar:"حلال معتمد", rating:4.7 }
+    ];
 
-// 🌍 Language
-let lang = "en";
+    let currentLang = 'en';
+    let map = null;
+    let markers = [];
+    let isPaid = localStorage.getItem('tastehome_paid') === 'true';
 
-const text = {
-    en: {search:"Search halal food..."},
-    zh: {search:"搜索清真餐厅"},
-    ar: {search:"ابحث عن طعام حلال"}
-};
+    // 多语言文本
+    const translations = {
+        en: { searchPlaceholder: "Search halal food...", unlockBtn: "🔓 Unlock All Restaurants (¥9.9)", modalTitle: "Unlock All Restaurants", modalDesc: "Pay ¥9.9 to get full access", confirmMsg: "✓ Payment confirmed! All restaurants unlocked." },
+        zh: { searchPlaceholder: "搜索清真餐厅...", unlockBtn: "🔓 解锁全部餐厅 (¥9.9)", modalTitle: "解锁全部餐厅", modalDesc: "支付 ¥9.9 解锁全部餐厅", confirmMsg: "✓ 支付已确认！已解锁全部餐厅。" },
+        ar: { searchPlaceholder: "ابحث عن طعام حلال...", unlockBtn: "🔓 فتح جميع المطاعم (¥9.9)", modalTitle: "فتح جميع المطاعم", modalDesc: "ادفع ¥9.9 للوصول الكامل", confirmMsg: "✓ تم تأكيد الدفع! تم فتح جميع المطاعم." }
+    };
 
-// 🍜 Data
-const data = [
-    {name_en:"Lanzhou Noodles", name_zh:"兰州拉面", name_ar:"لانزو نودلز", lat:30.28, lng:120.02, halal:"Muslim-owned"},
-    {name_en:"Turkish Kebab", name_zh:"土耳其烤肉", name_ar:"كباب تركي", lat:30.25, lng:120.21, halal:"Halal Certified"}
-];
+    function getRestaurantName(r) {
+        if (currentLang === 'zh') return r.name_zh;
+        if (currentLang === 'ar') return r.name_ar;
+        return r.name_en;
+    }
+    function getAddress(r) {
+        if (currentLang === 'zh') return r.address_zh;
+        if (currentLang === 'ar') return r.address_ar;
+        return r.address_en;
+    }
+    function getHalal(r) {
+        if (currentLang === 'zh') return r.halal_zh;
+        if (currentLang === 'ar') return r.halal_ar;
+        return r.halal_en;
+    }
 
-let map = new AMap.Map('map', {
-    zoom:12,
-    center:[120.02,30.28]
-});
-
-function render() {
-    const list = document.getElementById("list");
-    list.innerHTML = "";
-
-    data.forEach(r=>{
-        const name = r["name_"+lang];
-
-        const div = document.createElement("div");
-        div.className="card";
-        div.innerHTML = `
-            <h3>${name}</h3>
-            ⭐ 4.5
-            <div class="tag">${r.halal}</div>
-        `;
-        list.appendChild(div);
-
-        new AMap.Marker({
-            position:[r.lng, r.lat],
-            map:map,
-            title:name
+    function renderRestaurants() {
+        const container = document.getElementById('list');
+        const unlockDiv = document.getElementById('unlockContainer');
+        container.innerHTML = '';
+        const displayList = isPaid ? restaurantsData : restaurantsData.slice(0, 3);
+        displayList.forEach(r => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <h3>${getRestaurantName(r)} ⭐ ${r.rating}</h3>
+                <p>📍 ${getAddress(r)}</p>
+                <div class="tag">✅ ${getHalal(r)}</div>
+            `;
+            card.onclick = () => alert(`${getRestaurantName(r)}\n📍 ${getAddress(r)}\n✅ ${getHalal(r)}`);
+            container.appendChild(card);
         });
-    });
-}
+        if (!isPaid && restaurantsData.length > 3) {
+            unlockDiv.innerHTML = `<button class="unlock-btn" onclick="showPaymentModal()">${translations[currentLang].unlockBtn}</button>`;
+        } else {
+            unlockDiv.innerHTML = '';
+        }
+    }
 
-function setLang(l){
-    lang = l;
-    document.getElementById("searchInput").placeholder = text[l].search;
-    render();
-}
+    function updateMapMarkers() {
+        if (!map) return;
+        markers.forEach(m => m.setMap(null));
+        markers = [];
+        const displayList = isPaid ? restaurantsData : restaurantsData.slice(0, 3);
+        displayList.forEach(r => {
+            const marker = new AMap.Marker({
+                position: [r.lng, r.lat],
+                map: map,
+                title: getRestaurantName(r)
+            });
+            marker.on('click', () => alert(`${getRestaurantName(r)}\n📍 ${getAddress(r)}`));
+            markers.push(marker);
+        });
+        if (markers.length) map.setFitView(markers);
+    }
 
-function search(){
-    alert("Search coming soon (for competition demo)");
-}
+    function initMap() {
+        map = new AMap.Map('map', {
+            center: [120.016255, 30.292797],
+            zoom: 13,
+            viewMode: '2D'
+        });
+        updateMapMarkers();
+    }
 
-render();
+    // 搜索功能（简单过滤）
+    function searchRestaurants() {
+        const keyword = document.getElementById('searchInput').value.toLowerCase();
+        const container = document.getElementById('list');
+        const displayList = isPaid ? restaurantsData : restaurantsData.slice(0, 3);
+        const filtered = displayList.filter(r => 
+            getRestaurantName(r).toLowerCase().includes(keyword) || 
+            getAddress(r).toLowerCase().includes(keyword)
+        );
+        container.innerHTML = '';
+        filtered.forEach(r => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <h3>${getRestaurantName(r)} ⭐ ${r.rating}</h3>
+                <p>📍 ${getAddress(r)}</p>
+                <div class="tag">✅ ${getHalal(r)}</div>
+            `;
+            card.onclick = () => alert(`${getRestaurantName(r)}\n📍 ${getAddress(r)}\n✅ ${getHalal(r)}`);
+            container.appendChild(card);
+        });
+        if (filtered.length === 0) container.innerHTML = '<div class="card">No results found</div>';
+    }
 
+    // 语言切换
+    function setLang(lang) {
+        currentLang = lang;
+        document.getElementById('searchInput').placeholder = translations[lang].searchPlaceholder;
+        document.getElementById('modalTitle').innerText = translations[lang].modalTitle;
+        document.getElementById('modalDesc').innerText = translations[lang].modalDesc;
+        renderRestaurants();
+        updateMapMarkers();
+    }
+
+    // 支付弹窗
+    function showPaymentModal() { document.getElementById('paymentModal').style.display = 'flex'; }
+    function closeModal() { document.getElementById('paymentModal').style.display = 'none'; }
+    function confirmPayment() {
+        isPaid = true;
+        localStorage.setItem('tastehome_paid', 'true');
+        closeModal();
+        renderRestaurants();
+        updateMapMarkers();
+        alert(translations[currentLang].confirmMsg);
+    }
+
+    // 初始化
+    window.onload = () => {
+        initMap();
+        renderRestaurants();
+        document.getElementById('confirmPayBtn').onclick = confirmPayment;
+        document.getElementById('closeModalBtn').onclick = closeModal;
+        window.searchRestaurants = searchRestaurants;
+        window.setLang = setLang;
+        window.showPaymentModal = showPaymentModal;
+    };
 </script>
-
 </body>
 </html>
