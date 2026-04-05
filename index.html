@@ -1,226 +1,145 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>TasteHome - 国际美食地图</title>
-    <script src="https://webapi.amap.com/maps?v=2.0&key=b0ed148e34bc74e1b2f77fbda7e2926d&plugin=AMap.Scale,AMap.ToolBar"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; display: flex; flex-direction: column; min-height: 100vh; }
-        header { background: #2c7a4d; color: white; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 80px; }
-        .logo-area { width: 120px; }
-        .center-logo { text-align: center; flex: 1; }
-        .center-logo img { height: 60px; object-fit: contain; }
-        .right-buttons { display: flex; gap: 12px; align-items: center; }
-        .lang-switch { background: white; border: none; padding: 6px 16px; border-radius: 30px; font-weight: 600; cursor: pointer; color: #2c7a4d; }
-        .filter-tabs { display: flex; gap: 12px; margin: 20px 0; flex-wrap: wrap; }
-        .filter-tab { background: none; border: none; padding: 6px 16px; font-size: 0.9rem; font-weight: 500; color: #666; cursor: pointer; border-radius: 30px; }
-        .filter-tab.active { background: #2c7a4d; color: white; }
-        main { max-width: 1200px; margin: 0 auto; padding: 0 16px; flex: 1; width: 100%; }
-        #map { height: 450px; border-radius: 24px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .restaurant-card { background: white; border-radius: 20px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; }
-        .restaurant-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
-        .restaurant-name { font-weight: 700; font-size: 1.4rem; color: #1e3a2f; }
-        .restaurant-address { font-size: 0.9rem; color: #5a6e5c; margin-top: 6px; }
-        .restaurant-meta { font-size: 0.8rem; color: #b86b2c; display: inline-block; background: #fef2e0; padding: 4px 12px; border-radius: 30px; margin-top: 10px; }
-        .unlock-btn { background: #ffc107; color: #1e3a2f; border: none; padding: 12px 20px; border-radius: 40px; font-weight: bold; font-size: 1rem; cursor: pointer; width: 100%; margin-top: 20px; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 2000; }
-        .modal-content { background: white; padding: 24px; border-radius: 28px; max-width: 500px; width: 90%; text-align: center; }
-        .qr-box img { width: 200px; height: auto; margin: 16px auto; border-radius: 16px; }
-        footer { background: #f2f2f2; padding: 40px 20px 20px; margin-top: 60px; border-top: 1px solid #ddd; }
-        .footer-container { max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 30px; }
-        .footer-col { flex: 1; min-width: 150px; }
-        .footer-col h4 { font-size: 1rem; margin-bottom: 16px; color: #333; }
-        .footer-col ul { list-style: none; }
-        .footer-col li { margin-bottom: 8px; }
-        .footer-col a { color: #666; text-decoration: none; font-size: 0.85rem; }
-        .copyright { text-align: center; padding-top: 30px; font-size: 0.75rem; color: #888; border-top: 1px solid #ddd; margin-top: 30px; }
-        @media (max-width: 768px) { .center-logo img { height: 40px; } }
-        @media (max-width: 600px) { #map { height: 300px; } header { height: 60px; } }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TasteHome - Halal Food Finder</title>
+
+<script src="https://webapi.amap.com/maps?v=2.0&key=b0ed148e34bc74e1b2f77fbda7e2926d"></script>
+
+<style>
+body { font-family: Arial; margin:0; background:#f8f9fa; }
+
+/* Header */
+header {
+    background:#2c7a4d;
+    color:white;
+    display:flex;
+    justify-content:space-between;
+    padding:10px 20px;
+}
+
+button { cursor:pointer; }
+
+/* Search */
+.search-bar {
+    margin:20px;
+    display:flex;
+    gap:10px;
+}
+
+.search-bar input {
+    flex:1;
+    padding:10px;
+    border-radius:20px;
+    border:1px solid #ccc;
+}
+
+/* Map */
+#map {
+    height:300px;
+    margin:20px;
+    border-radius:20px;
+}
+
+/* Card */
+.card {
+    background:white;
+    margin:15px;
+    padding:15px;
+    border-radius:15px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.1);
+}
+
+.tag {
+    background:#fef2e0;
+    padding:5px 10px;
+    border-radius:20px;
+    display:inline-block;
+    margin-top:5px;
+}
+</style>
 </head>
+
 <body>
 
 <header>
-    <div class="logo-area"></div>
-    <div class="center-logo">
-        <img src="logo-simple.png" alt="TasteHome">
-    </div>
-    <div class="right-buttons">
-        <button id="langBtn" class="lang-switch">中文</button>
+    <h2>TasteHome 🕌</h2>
+    <div>
+        <button onclick="setLang('en')">EN</button>
+        <button onclick="setLang('zh')">中</button>
+        <button onclick="setLang('ar')">AR</button>
     </div>
 </header>
 
-<main>
-    <div id="map"></div>
-    <div class="filter-tabs" id="filterTabs">
-        <button class="filter-tab active" data-filter="all">All</button>
-        <button class="filter-tab" data-filter="price">Price</button>
-        <button class="filter-tab" data-filter="open">Open Now</button>
-        <button class="filter-tab" data-filter="reservations">Reservations</button>
-    </div>
-    <div id="restaurantList"></div>
-    <div id="unlockArea"></div>
-</main>
-
-<footer>
-    <div class="footer-container">
-        <div class="footer-col"><h4>About TasteHome</h4><ul><li><a href="#">About Us</a></li><li><a href="#">Team</a></li><li><a href="#">Contact</a></li><li><a href="#">Privacy</a></li></ul></div>
-        <div class="footer-col"><h4>Discover</h4><ul><li><a href="#">Halal</a></li><li><a href="#">Indian</a></li><li><a href="#">Thai</a></li></ul></div>
-        <div class="footer-col"><h4>For Business</h4><ul><li><a href="#">List Restaurant</a></li><li><a href="#">Advertise</a></li></ul></div>
-        <div class="footer-col"><h4>Support</h4><ul><li><a href="#">Help</a></li><li><a href="#">Volunteer</a></li></ul></div>
-    </div>
-    <div class="copyright">© 2025 TasteHome | Find your taste of home</div>
-</footer>
-
-<!-- 支付弹窗 -->
-<div id="paymentModal" class="modal">
-    <div class="modal-content">
-        <h3 id="modalTitle">Unlock All Restaurants</h3>
-        <p id="modalDesc">Pay ¥9.9 to get full access</p>
-        <div class="qr-box">
-            <img src="收款码.png" alt="Payment QR Code">
-        </div>
-        <button id="confirmPayBtn">✓ I have paid / 我已支付</button>
-        <button id="closeModalBtn">Cancel</button>
-    </div>
+<div class="search-bar">
+    <input id="searchInput" placeholder="Search halal food...">
+    <button onclick="search()">🔍</button>
 </div>
 
+<div id="map"></div>
+
+<div id="list"></div>
+
 <script>
-    // 餐厅数据（6家）
-    const restaurantsData = [
-        { id: 1, name_cn: "兰州拉面（仓前店）", name_en: "Lanzhou Noodles", lat: 30.28621, lng: 120.019159, address_cn: "余杭区仓前街道", address_en: "Cangqian St", certification_cn: "穆斯林经营", certification_en: "Muslim-owned", rating: 4.3, price_level: "¥", open_now: true, reservations: false },
-        { id: 2, name_cn: "疆厨子·抓饭·烤肉", name_en: "Jiang Kitchen", lat: 30.274897, lng: 120.021742, address_cn: "余杭区仓前街道", address_en: "Cangqian St", certification_cn: "清真认证", certification_en: "Halal Certified", rating: 4.5, price_level: "¥¥", open_now: true, reservations: true },
-        { id: 3, name_cn: "SOUQ黎巴嫩烤肉", name_en: "SOUQ Lebanese BBQ", lat: 30.251497, lng: 120.212689, address_cn: "平安悦坊", address_en: "Ping'an Yuefang", certification_cn: "清真认证", certification_en: "Halal Certified", rating: 4.4, price_level: "¥¥¥", open_now: false, reservations: true },
-        { id: 4, name_cn: "Uncle Kosto中东菜", name_en: "Uncle Kosto", lat: 30.313583, lng: 120.392775, address_cn: "中东菜餐厅", address_en: "Middle Eastern", certification_cn: "穆斯林经营", certification_en: "Muslim-owned", rating: 4.6, price_level: "¥¥", open_now: true, reservations: false },
-        { id: 5, name_cn: "喀摩尔土耳其餐厅", name_en: "Kamoer Turkish", lat: 30.247915, lng: 120.170652, address_cn: "中山中路", address_en: "Zhongshan Rd", certification_cn: "清真认证", certification_en: "Halal Certified", rating: 4.5, price_level: "¥¥¥", open_now: false, reservations: true },
-        { id: 6, name_cn: "halal迪拜土耳其餐厅", name_en: "Halal Dubai Turkish", lat: 30.257386, lng: 120.159474, address_cn: "西湖音乐喷泉", address_en: "West Lake", certification_cn: "清真认证", certification_en: "Halal Certified", rating: 4.7, price_level: "¥¥¥¥", open_now: true, reservations: true }
-    ];
 
-    let currentLang = 'en';
-    let map = null;
-    let markers = [];
-    let isPaidUser = localStorage.getItem('tastehome_paid') === 'true';
-    let currentFilter = 'all';
+// 🌍 Language
+let lang = "en";
 
-    // 筛选逻辑
-    function filterRestaurants(list) {
-        let filtered = [...list];
-        if (currentFilter === 'price') {
-            const order = { "¥":1, "¥¥":2, "¥¥¥":3, "¥¥¥¥":4 };
-            filtered.sort((a,b) => (order[a.price_level]||0) - (order[b.price_level]||0));
-        } else if (currentFilter === 'open') {
-            filtered = filtered.filter(r => r.open_now === true);
-        } else if (currentFilter === 'reservations') {
-            filtered = filtered.filter(r => r.reservations === true);
-        }
-        return filtered;
-    }
+const text = {
+    en: {search:"Search halal food..."},
+    zh: {search:"搜索清真餐厅"},
+    ar: {search:"ابحث عن طعام حلال"}
+};
 
-    function displayRestaurants() {
-        const container = document.getElementById('restaurantList');
-        const unlockDiv = document.getElementById('unlockArea');
-        container.innerHTML = '';
-        let filtered = filterRestaurants(restaurantsData);
-        const displayList = isPaidUser ? filtered : filtered.slice(0, 3);
-        displayList.forEach(r => {
-            const card = document.createElement('div');
-            card.className = 'restaurant-card';
-            const name = currentLang === 'zh' ? r.name_cn : r.name_en;
-            const addr = currentLang === 'zh' ? r.address_cn : r.address_en;
-            const cert = currentLang === 'zh' ? r.certification_cn : r.certification_en;
-            card.innerHTML = `
-                <div class="restaurant-name">${name} ⭐ ${r.rating}</div>
-                <div class="restaurant-address">📍 ${addr}</div>
-                <div class="restaurant-meta">✅ ${cert}</div>
-            `;
-            card.onclick = () => alert(`${name}\n📍 ${addr}\n✅ ${cert}`);
-            container.appendChild(card);
+// 🍜 Data
+const data = [
+    {name_en:"Lanzhou Noodles", name_zh:"兰州拉面", name_ar:"لانزو نودلز", lat:30.28, lng:120.02, halal:"Muslim-owned"},
+    {name_en:"Turkish Kebab", name_zh:"土耳其烤肉", name_ar:"كباب تركي", lat:30.25, lng:120.21, halal:"Halal Certified"}
+];
+
+let map = new AMap.Map('map', {
+    zoom:12,
+    center:[120.02,30.28]
+});
+
+function render() {
+    const list = document.getElementById("list");
+    list.innerHTML = "";
+
+    data.forEach(r=>{
+        const name = r["name_"+lang];
+
+        const div = document.createElement("div");
+        div.className="card";
+        div.innerHTML = `
+            <h3>${name}</h3>
+            ⭐ 4.5
+            <div class="tag">${r.halal}</div>
+        `;
+        list.appendChild(div);
+
+        new AMap.Marker({
+            position:[r.lng, r.lat],
+            map:map,
+            title:name
         });
-        if (!isPaidUser && restaurantsData.length > 3) {
-            unlockDiv.innerHTML = `<button class="unlock-btn" onclick="showPaymentModal()">🔓 ${currentLang === 'zh' ? '解锁全部餐厅 (¥9.9)' : 'Unlock All Restaurants (¥9.9)'}</button>`;
-        } else {
-            unlockDiv.innerHTML = '';
-        }
-    }
+    });
+}
 
-    function updateMapMarkers() {
-        if (!map) return;
-        markers.forEach(m => m.setMap(null));
-        markers = [];
-        let filtered = filterRestaurants(restaurantsData);
-        const displayList = isPaidUser ? filtered : filtered.slice(0, 3);
-        displayList.forEach(r => {
-            const title = currentLang === 'zh' ? r.name_cn : r.name_en;
-            const marker = new AMap.Marker({
-                position: [r.lng, r.lat],
-                map: map,
-                title: title
-            });
-            marker.on('click', () => alert(`${title}\n📍 ${currentLang === 'zh' ? r.address_cn : r.address_en}`));
-            markers.push(marker);
-        });
-        if (markers.length) map.setFitView(markers);
-    }
+function setLang(l){
+    lang = l;
+    document.getElementById("searchInput").placeholder = text[l].search;
+    render();
+}
 
-    function initMap() {
-        map = new AMap.Map('map', {
-            center: [120.016255, 30.292797],
-            zoom: 13,
-            viewMode: '2D',
-            mapStyle: 'amap://styles/whitesmoke'
-        });
-        updateMapMarkers();
-    }
+function search(){
+    alert("Search coming soon (for competition demo)");
+}
 
-    function showPaymentModal() { document.getElementById('paymentModal').style.display = 'flex'; }
-    function closeModal() { document.getElementById('paymentModal').style.display = 'none'; }
-    function confirmPayment() {
-        isPaidUser = true;
-        localStorage.setItem('tastehome_paid', 'true');
-        closeModal();
-        displayRestaurants();
-        updateMapMarkers();
-        alert(currentLang === 'zh' ? '✓ 支付已确认！已解锁全部餐厅。' : '✓ Payment confirmed! All restaurants unlocked.');
-    }
+render();
 
-    // 语言切换
-    function setLanguage(lang) {
-        currentLang = lang;
-        document.getElementById('langBtn').innerText = currentLang === 'zh' ? 'English' : '中文';
-        document.getElementById('modalTitle').innerText = currentLang === 'zh' ? '解锁全部餐厅' : 'Unlock All Restaurants';
-        document.getElementById('modalDesc').innerText = currentLang === 'zh' ? '支付 ¥9.9 解锁全部餐厅' : 'Pay ¥9.9 to unlock all restaurants';
-        // 更新筛选标签文字
-        const tabs = document.querySelectorAll('.filter-tab');
-        if (tabs.length >= 4) {
-            tabs[0].innerText = currentLang === 'zh' ? '全部' : 'All';
-            tabs[1].innerText = currentLang === 'zh' ? '价格' : 'Price';
-            tabs[2].innerText = currentLang === 'zh' ? '营业中' : 'Open Now';
-            tabs[3].innerText = currentLang === 'zh' ? '可预订' : 'Reservations';
-        }
-        displayRestaurants();
-        updateMapMarkers();
-    }
-
-    // 页面加载
-    window.onload = () => {
-        initMap();
-        displayRestaurants();
-        // 筛选事件
-        document.querySelectorAll('.filter-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                currentFilter = tab.getAttribute('data-filter');
-                displayRestaurants();
-                updateMapMarkers();
-            });
-        });
-        document.getElementById('langBtn').onclick = () => setLanguage(currentLang === 'zh' ? 'en' : 'zh');
-        document.getElementById('confirmPayBtn').onclick = confirmPayment;
-        document.getElementById('closeModalBtn').onclick = closeModal;
-    };
 </script>
+
 </body>
 </html>
