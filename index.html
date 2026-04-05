@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>TasteHome - 国际美食地图</title>
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK (用于评价系统) -->
     <script type="module">
-        // 在这里粘贴你的 firebaseConfig（从 Firebase 控制台复制）
+        // 请替换为你的 Firebase 配置（如果不需要评价功能，可删除整个 script）
         const firebaseConfig = {
             apiKey: "YOUR_API_KEY",
             authDomain: "YOUR_PROJECT.firebaseapp.com",
@@ -15,72 +15,97 @@
             messagingSenderId: "YOUR_SENDER_ID",
             appId: "YOUR_APP_ID"
         };
-        // 初始化 Firebase
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-        import { getFirestore, collection, addDoc, getDocs, query, orderBy, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-        
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+        import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        
-        // 匿名登录，让每个用户有唯一ID，无需注册（简化操作）
-        signInAnonymously(auth).catch(error => console.error("匿名登录失败", error));
-        
+        signInAnonymously(auth).catch(e => console.error);
         window.db = db;
-        window.auth = auth;
     </script>
     <!-- 高德地图 API -->
     <script src="https://webapi.amap.com/maps?v=2.0&key=b0ed148e34bc74e1b2f77fbda7e2926d&plugin=AMap.Scale,AMap.ToolBar"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; }
-        header { background: #2c7a4d; color: white; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; height: 70px; gap: 10px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; display: flex; flex-direction: column; min-height: 100vh; }
+        /* 头部 */
+        header { background: #2c7a4d; color: white; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; height: 70px; gap: 10px; flex-wrap: wrap; }
         .logo { height: 100%; max-height: 60px; object-fit: contain; }
-        .lang-switch { background: white; border: none; padding: 6px 16px; border-radius: 30px; font-weight: 600; color: #2c7a4d; cursor: pointer; }
-        main { max-width: 1200px; margin: 16px auto; padding: 0 16px; }
+        .lang-select { background: white; border: none; padding: 6px 12px; border-radius: 30px; font-weight: 600; color: #2c7a4d; cursor: pointer; margin-left: 10px; }
+        /* 主内容 */
+        main { max-width: 1200px; margin: 16px auto; padding: 0 16px; flex: 1; }
         #map { height: 400px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
         .search-filter { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-        .search-filter input, .search-filter select { padding: 8px 12px; border-radius: 30px; border: 1px solid #ddd; flex: 1; }
-        .restaurant-card { background: white; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; display: flex; justify-content: space-between; align-items: center; }
+        .search-filter input, .search-filter select { padding: 8px 12px; border-radius: 30px; border: 1px solid #ddd; flex: 1; background: white; }
+        .restaurant-card { background: white; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; }
         .restaurant-card:hover { background: #fef7e0; transform: translateY(-2px); }
-        .restaurant-info { flex: 1; }
         .restaurant-name { font-weight: 700; font-size: 1.2rem; color: #1e3a2f; }
         .restaurant-address { font-size: 0.85rem; color: #5a6e5c; margin-top: 4px; }
         .restaurant-meta { font-size: 0.75rem; color: #b86b2c; display: inline-block; background: #fef2e0; padding: 4px 10px; border-radius: 30px; margin-top: 6px; }
-        .favorite-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #ccc; }
-        .favorite-btn.active { color: #e74c3c; }
+        .unlock-btn { background: #ffc107; color: #1e3a2f; border: none; padding: 12px 20px; border-radius: 40px; font-weight: bold; font-size: 1rem; cursor: pointer; width: 100%; margin-top: 12px; }
+        /* 弹窗 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 2000; }
-        .modal-content { background: white; padding: 24px; border-radius: 28px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
-        .review-item { border-bottom: 1px solid #eee; padding: 12px 0; }
-        .review-user { font-weight: bold; }
-        .review-rating { color: #ffc107; }
-        .review-text { margin-top: 6px; color: #333; }
-        .review-time { font-size: 0.7rem; color: #999; margin-top: 4px; }
-        button { background: #2c7a4d; color: white; border: none; padding: 8px 16px; border-radius: 30px; cursor: pointer; margin: 5px; }
-        .footer { text-align: center; margin: 30px 0 20px; font-size: 12px; color: #8b9a8b; }
-        @media (max-width: 600px) { #map { height: 300px; } header { height: 60px; } }
+        .modal-content { background: white; padding: 24px; border-radius: 28px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; text-align: center; }
+        .qr-box img { width: 200px; height: auto; margin: 10px auto; border-radius: 12px; }
+        .countdown { font-size: 1.2rem; color: #e67e22; margin: 10px 0; }
+        .review-item { border-bottom: 1px solid #eee; padding: 12px 0; text-align: left; }
+        /* 底部（仿Yelp） */
+        footer { background: #f2f2f2; padding: 40px 20px 20px; margin-top: 40px; border-top: 1px solid #ddd; }
+        .footer-container { max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 30px; }
+        .footer-col { flex: 1; min-width: 150px; }
+        .footer-col h4 { font-size: 1rem; margin-bottom: 16px; color: #333; }
+        .footer-col ul { list-style: none; }
+        .footer-col li { margin-bottom: 8px; }
+        .footer-col a { color: #666; text-decoration: none; font-size: 0.85rem; }
+        .footer-col a:hover { color: #2c7a4d; text-decoration: underline; }
+        .copyright { text-align: center; padding-top: 30px; font-size: 0.75rem; color: #888; border-top: 1px solid #ddd; margin-top: 30px; }
+        @media (max-width: 768px) { .footer-container { flex-direction: column; gap: 20px; } }
+        @media (max-width: 600px) { #map { height: 300px; } header { height: auto; padding: 10px 20px; } }
+        /* 阿拉伯语从右到左 */
+        .arabic { direction: rtl; font-family: 'Segoe UI', 'Tahoma', sans-serif; }
     </style>
 </head>
 <body>
+
 <header>
     <img src="logo-simple.png" alt="TasteHome" class="logo">
-    <button id="langBtn" class="lang-switch">中文</button>
+    <div>
+        <button id="langBtn" class="lang-switch" style="background:white; border:none; padding:6px 16px; border-radius:30px;">English</button>
+        <select id="langSelect" class="lang-select">
+            <option value="en">English</option>
+            <option value="zh">中文</option>
+            <option value="ar">العربية</option>
+        </select>
+    </div>
 </header>
+
 <main>
     <div id="map"></div>
     <div class="search-filter">
-        <input type="text" id="searchInput" placeholder="搜索餐厅...">
+        <input type="text" id="searchInput" placeholder="Search restaurants...">
         <select id="certFilter">
-            <option value="">所有认证</option>
-            <option value="穆斯林经营">穆斯林经营</option>
-            <option value="清真认证">清真认证</option>
+            <option value="">All Certifications</option>
+            <option value="穆斯林经营">Muslim-owned</option>
+            <option value="清真认证">Halal Certified</option>
         </select>
     </div>
     <div id="restaurantList"></div>
+    <div id="unlockArea" style="display: none;"></div>
 </main>
-<div class="footer">
-    <p>📍 点击餐厅查看详情、发表评价 | 所有人可见</p>
+
+<!-- 支付弹窗（自动倒计时解锁） -->
+<div id="paymentModal" class="modal">
+    <div class="modal-content">
+        <h3 id="modalTitle">Unlock All Restaurants</h3>
+        <p id="modalDesc">Pay ¥9.9 to get full access</p>
+        <div class="qr-box">
+            <div style="font-size: 12px; margin-bottom: 8px;">👇 Scan to pay ¥9.9 👇</div>
+            <img src="收款码.png" alt="Payment QR Code">
+            <div class="countdown" id="countdownMsg">Waiting for payment... 10s auto unlock</div>
+        </div>
+        <button id="cancelPayBtn" style="background:#ccc;">Cancel</button>
+    </div>
 </div>
 
 <!-- 餐厅详情弹窗 -->
@@ -88,52 +113,172 @@
     <div class="modal-content" id="detailContent"></div>
 </div>
 
+<!-- 底部（仿Yelp风格） -->
+<footer>
+    <div class="footer-container">
+        <div class="footer-col">
+            <h4 data-i18n="about">About TasteHome</h4>
+            <ul>
+                <li><a href="#" data-i18n="about_us">About Us</a></li>
+                <li><a href="#" data-i18n="team">Team</a></li>
+                <li><a href="#" data-i18n="contact">Contact</a></li>
+                <li><a href="#" data-i18n="privacy">Privacy Policy</a></li>
+                <li><a href="#" data-i18n="terms">Terms of Service</a></li>
+            </ul>
+        </div>
+        <div class="footer-col">
+            <h4 data-i18n="discover">Discover</h4>
+            <ul>
+                <li><a href="#" data-i18n="halal">Halal Restaurants</a></li>
+                <li><a href="#" data-i18n="indian">Indian Cuisine</a></li>
+                <li><a href="#" data-i18n="thai">Thai Cuisine</a></li>
+                <li><a href="#" data-i18n="malaysian">Malaysian Cuisine</a></li>
+                <li><a href="#" data-i18n="mexican">Mexican Cuisine</a></li>
+            </ul>
+        </div>
+        <div class="footer-col">
+            <h4 data-i18n="for_business">For Business</h4>
+            <ul>
+                <li><a href="#" data-i18n="list_restaurant">List Your Restaurant</a></li>
+                <li><a href="#" data-i18n="advertise">Advertise</a></li>
+                <li><a href="#" data-i18n="coupons">Coupons & Promotions</a></li>
+                <li><a href="#" data-i18n="business_login">Business Login</a></li>
+            </ul>
+        </div>
+        <div class="footer-col">
+            <h4 data-i18n="support">Support</h4>
+            <ul>
+                <li><a href="#" data-i18n="help">Help Center</a></li>
+                <li><a href="#" data-i18n="volunteer">Volunteer Recruitment</a></li>
+                <li><a href="#" data-i18n="ambassador">Campus Ambassador</a></li>
+            </ul>
+        </div>
+    </div>
+    <div class="copyright" data-i18n="copyright">© 2025 TasteHome International Food Map | Find your taste of home</div>
+</footer>
+
 <script>
-    // 餐厅数据（6家）
+    // ==================== 餐厅数据（6家）====================
     const restaurantsData = [
-        { id: 1, name_cn: "兰州拉面（仓前店）", name_en: "Lanzhou Noodles (Cangqian)", lat: 30.28621, lng: 120.019159, address_cn: "余杭区仓前街道", address_en: "Cangqian Street", certification_cn: "穆斯林经营", certification_en: "Muslim-owned", rating: 4.3 },
-        { id: 2, name_cn: "疆厨子·抓饭·烤肉", name_en: "Jiang Kitchen - Rice & BBQ", lat: 30.274897, lng: 120.021742, address_cn: "余杭区仓前街道", address_en: "Cangqian Street", certification_cn: "清真认证", certification_en: "Halal Certified", rating: 4.5 },
-        { id: 3, name_cn: "SOUQ · 黎巴嫩烤肉(平安悦坊店)", name_en: "SOUQ Lebanese BBQ", lat: 30.251497, lng: 120.212689, address_cn: "平安悦坊", address_en: "Ping'an Yuefang", certification_cn: "清真认证", certification_en: "Halal Certified", rating: 4.4 },
-        { id: 4, name_cn: "Uncle Kosto科斯托·中东菜", name_en: "Uncle Kosto Middle Eastern", lat: 30.313583, lng: 120.392775, address_cn: "中东菜餐厅", address_en: "Middle Eastern Restaurant", certification_cn: "穆斯林经营", certification_en: "Muslim-owned", rating: 4.6 },
-        { id: 5, name_cn: "喀摩尔土耳其风味餐厅·中东美食·异域风情(中山中路店)", name_en: "Kamoer Turkish Cuisine", lat: 30.247915, lng: 120.170652, address_cn: "中山中路", address_en: "Zhongshan Middle Road", certification_cn: "清真认证", certification_en: "Halal Certified", rating: 4.5 },
-        { id: 6, name_cn: "halal迪拜土耳其清真餐厅·烧烤.宴会团建(西湖音乐喷泉店)", name_en: "Halal Dubai Turkish BBQ", lat: 30.257386, lng: 120.159474, address_cn: "西湖音乐喷泉", address_en: "West Lake Music Fountain", certification_cn: "清真认证", certification_en: "Halal Certified", rating: 4.7 }
+        { id: 1, name_cn: "兰州拉面（仓前店）", name_en: "Lanzhou Noodles (Cangqian)", name_ar: "لانزو نودلز", lat: 30.28621, lng: 120.019159, address_cn: "余杭区仓前街道", address_en: "Cangqian Street", address_ar: "شارع تشانغتشيان", certification_cn: "穆斯林经营", certification_en: "Muslim-owned", certification_ar: "حلال مملوك للمسلمين", rating: 4.3 },
+        { id: 2, name_cn: "疆厨子·抓饭·烤肉", name_en: "Jiang Kitchen - Rice & BBQ", name_ar: "مطبخ جيانغ", lat: 30.274897, lng: 120.021742, address_cn: "余杭区仓前街道", address_en: "Cangqian Street", address_ar: "شارع تشانغتشيان", certification_cn: "清真认证", certification_en: "Halal Certified", certification_ar: "حلال معتمد", rating: 4.5 },
+        { id: 3, name_cn: "SOUQ · 黎巴嫩烤肉(平安悦坊店)", name_en: "SOUQ Lebanese BBQ", name_ar: "سوق شواء لبناني", lat: 30.251497, lng: 120.212689, address_cn: "平安悦坊", address_en: "Ping'an Yuefang", address_ar: "بينغ آن يويه فانغ", certification_cn: "清真认证", certification_en: "Halal Certified", certification_ar: "حلال معتمد", rating: 4.4 },
+        { id: 4, name_cn: "Uncle Kosto科斯托·中东菜", name_en: "Uncle Kosto Middle Eastern", name_ar: "عم كوستو", lat: 30.313583, lng: 120.392775, address_cn: "中东菜餐厅", address_en: "Middle Eastern Restaurant", address_ar: "مطعم شرق أوسطي", certification_cn: "穆斯林经营", certification_en: "Muslim-owned", certification_ar: "حلال مملوك للمسلمين", rating: 4.6 },
+        { id: 5, name_cn: "喀摩尔土耳其风味餐厅·中东美食·异域风情(中山中路店)", name_en: "Kamoer Turkish Cuisine", name_ar: "كاموير تركي", lat: 30.247915, lng: 120.170652, address_cn: "中山中路", address_en: "Zhongshan Middle Road", address_ar: "طريق تشونغشان الأوسط", certification_cn: "清真认证", certification_en: "Halal Certified", certification_ar: "حلال معتمد", rating: 4.5 },
+        { id: 6, name_cn: "halal迪拜土耳其清真餐厅·烧烤.宴会团建(西湖音乐喷泉店)", name_en: "Halal Dubai Turkish BBQ", name_ar: "دبي تركي حلال", lat: 30.257386, lng: 120.159474, address_cn: "西湖音乐喷泉", address_en: "West Lake Music Fountain", address_ar: "نافورة ويست ليك الموسيقية", certification_cn: "清真认证", certification_en: "Halal Certified", certification_ar: "حلال معتمد", rating: 4.7 }
     ];
 
-    let currentLang = 'en';
+    let currentLang = 'en';   // 'en', 'zh', 'ar'
     let map = null;
     let markers = [];
-    let currentUserId = null;
+    let isPaidUser = localStorage.getItem('tastehome_paid') === 'true';
+    let countdownTimer = null;
 
-    // 辅助函数
-    function t(zh, en) { return currentLang === 'zh' ? zh : en; }
+    // 多语言文本库
+    const translations = {
+        en: {
+            unlock_btn: "🔓 Unlock All Restaurants (¥9.9)",
+            unlock_title: "Unlock All Restaurants",
+            unlock_desc: "Pay ¥9.9 to get full access",
+            confirm_msg: "✓ Payment confirmed! All restaurants unlocked.",
+            search_placeholder: "Search restaurants...",
+            all_cert: "All Certifications",
+            muslim: "Muslim-owned",
+            halal_cert: "Halal Certified",
+            nav_btn: "🧭 Navigate",
+            help_btn: "🙋 Ask for Companion (Coming soon)",
+            reviews_title: "User Reviews",
+            no_reviews: "No reviews yet. Be the first!",
+            write_review: "Write your review...",
+            submit_review: "Submit Review",
+            rating: "Rating:",
+            close: "Close",
+            cancel_pay: "Cancel"
+        },
+        zh: {
+            unlock_btn: "🔓 解锁全部餐厅 (¥9.9)",
+            unlock_title: "解锁全部餐厅",
+            unlock_desc: "支付 ¥9.9 解锁全部清真餐厅",
+            confirm_msg: "✓ 支付已确认！已解锁全部餐厅。",
+            search_placeholder: "搜索餐厅...",
+            all_cert: "所有认证",
+            muslim: "穆斯林经营",
+            halal_cert: "清真认证",
+            nav_btn: "🧭 导航",
+            help_btn: "🙋 求带（即将开放）",
+            reviews_title: "用户评价",
+            no_reviews: "暂无评价，快来发表第一条吧！",
+            write_review: "写下你的评价...",
+            submit_review: "发表评价",
+            rating: "评分：",
+            close: "关闭",
+            cancel_pay: "取消"
+        },
+        ar: {
+            unlock_btn: "🔓 فتح جميع المطاعم (¥9.9)",
+            unlock_title: "فتح جميع المطاعم",
+            unlock_desc: "ادفع ¥9.9 للوصول الكامل",
+            confirm_msg: "✓ تم تأكيد الدفع! تم فتح جميع المطاعم.",
+            search_placeholder: "ابحث عن مطعم...",
+            all_cert: "جميع الشهادات",
+            muslim: "حلال مملوك للمسلمين",
+            halal_cert: "حلال معتمد",
+            nav_btn: "🧭 ملاحة",
+            help_btn: "🙋 طلب مرافق (قريباً)",
+            reviews_title: "تقييمات المستخدمين",
+            no_reviews: "لا توجد تقييمات بعد. كن الأول!",
+            write_review: "اكتب تقييمك...",
+            submit_review: "نشر التقييم",
+            rating: "التقييم:",
+            close: "إغلاق",
+            cancel_pay: "إلغاء"
+        }
+    };
+
+    function t(key) { return translations[currentLang][key] || key; }
+
+    // 隐藏用户名（只显示首字母+***）
+    function maskUsername(name) {
+        if (!name || name.length < 2) return name;
+        return name[0] + '***';
+    }
 
     // 显示餐厅列表
     function displayRestaurants() {
         const container = document.getElementById('restaurantList');
+        const unlockContainer = document.getElementById('unlockArea');
         container.innerHTML = '';
         let filtered = [...restaurantsData];
         const keyword = document.getElementById('searchInput').value.toLowerCase();
-        if (keyword) filtered = filtered.filter(r => r.name_cn.includes(keyword) || r.name_en.toLowerCase().includes(keyword));
+        if (keyword) {
+            filtered = filtered.filter(r => r.name_cn.includes(keyword) || r.name_en.toLowerCase().includes(keyword) || (r.name_ar && r.name_ar.includes(keyword)));
+        }
         const cert = document.getElementById('certFilter').value;
-        if (cert) filtered = filtered.filter(r => r.certification_cn === cert);
-        // 免费版显示前3家，为演示，我们全部显示（因为还没做付费）
-        const displayList = filtered;
+        if (cert) {
+            filtered = filtered.filter(r => r.certification_cn === cert || r.certification_en === cert);
+        }
+        const displayList = isPaidUser ? filtered : filtered.slice(0, 3);
         displayList.forEach(rest => {
             const card = document.createElement('div');
             card.className = 'restaurant-card';
-            const name = currentLang === 'en' ? rest.name_en : rest.name_cn;
-            const addr = currentLang === 'en' ? rest.address_en : rest.address_cn;
-            const certText = currentLang === 'en' ? rest.certification_en : rest.certification_cn;
+            let name, addr, certText;
+            if (currentLang === 'zh') { name = rest.name_cn; addr = rest.address_cn; certText = rest.certification_cn; }
+            else if (currentLang === 'ar') { name = rest.name_ar || rest.name_en; addr = rest.address_ar || rest.address_en; certText = rest.certification_ar || rest.certification_en; }
+            else { name = rest.name_en; addr = rest.address_en; certText = rest.certification_en; }
             card.innerHTML = `
-                <div class="restaurant-info">
-                    <div class="restaurant-name">${name} ⭐ ${rest.rating}</div>
-                    <div class="restaurant-address">📍 ${addr}</div>
-                    <div class="restaurant-meta">✅ ${certText}</div>
-                </div>
+                <div class="restaurant-name">${name} ⭐ ${rest.rating}</div>
+                <div class="restaurant-address">📍 ${addr}</div>
+                <div class="restaurant-meta">✅ ${certText}</div>
             `;
             card.onclick = () => showRestaurantDetail(rest);
             container.appendChild(card);
         });
+        if (!isPaidUser && restaurantsData.length > 3) {
+            unlockContainer.innerHTML = `<button class="unlock-btn" onclick="showPaymentModal()">${t('unlock_btn')}</button>`;
+            unlockContainer.style.display = 'block';
+        } else {
+            unlockContainer.style.display = 'none';
+        }
     }
 
     // 更新地图标记
@@ -141,11 +286,13 @@
         if (!map) return;
         markers.forEach(m => m.setMap(null));
         markers = [];
-        restaurantsData.forEach(rest => {
+        const displayList = isPaidUser ? restaurantsData : restaurantsData.slice(0, 3);
+        displayList.forEach(rest => {
+            let title = currentLang === 'zh' ? rest.name_cn : (currentLang === 'ar' ? (rest.name_ar || rest.name_en) : rest.name_en);
             const marker = new AMap.Marker({
                 position: [rest.lng, rest.lat],
                 map: map,
-                title: currentLang === 'en' ? rest.name_en : rest.name_cn,
+                title: title,
             });
             marker.on('click', () => showRestaurantDetail(rest));
             markers.push(marker);
@@ -153,83 +300,113 @@
         if (markers.length) map.setFitView(markers);
     }
 
-    // 显示餐厅详情并加载评价
+    // 显示餐厅详情 + 评价（Firebase）
     async function showRestaurantDetail(rest) {
         const detailContent = document.getElementById('detailContent');
-        detailContent.innerHTML = `<div style="text-align:center">加载中...</div>`;
+        detailContent.innerHTML = `<div style="text-align:center">${currentLang === 'ar' ? 'جاري التحميل...' : '加载中...'}</div>`;
         document.getElementById('detailModal').style.display = 'flex';
-        
-        // 从 Firestore 读取该餐厅的评价
-        const reviewsRef = collection(window.db, `restaurants/${rest.id}/reviews`);
-        const q = query(reviewsRef, orderBy('createdAt', 'desc'));
-        const snapshot = await getDocs(q);
         let reviewsHtml = '';
-        snapshot.forEach(doc => {
-            const rev = doc.data();
-            const stars = '★'.repeat(rev.rating) + '☆'.repeat(5-rev.rating);
-            reviewsHtml += `
-                <div class="review-item">
-                    <div class="review-user">${rev.userName || '匿名用户'}</div>
-                    <div class="review-rating">${stars}</div>
-                    <div class="review-text">${rev.text}</div>
-                    <div class="review-time">${new Date(rev.createdAt).toLocaleString()}</div>
-                </div>
-            `;
-        });
-        if (!reviewsHtml) reviewsHtml = '<p>暂无评价，快来发表第一条评价吧！</p>';
-        
-        const name = currentLang === 'en' ? rest.name_en : rest.name_cn;
-        const addr = currentLang === 'en' ? rest.address_en : rest.address_cn;
-        const cert = currentLang === 'en' ? rest.certification_en : rest.certification_cn;
-        
+        if (window.db) {
+            try {
+                const reviewsRef = collection(window.db, `restaurants/${rest.id}/reviews`);
+                const q = query(reviewsRef, orderBy('createdAt', 'desc'));
+                const snapshot = await getDocs(q);
+                snapshot.forEach(doc => {
+                    const rev = doc.data();
+                    const stars = '★'.repeat(rev.rating) + '☆'.repeat(5-rev.rating);
+                    const maskedName = maskUsername(rev.userName || (currentLang === 'ar' ? 'مستخدم مجهول' : 'Anonymous'));
+                    reviewsHtml += `
+                        <div class="review-item">
+                            <div class="review-user">${maskedName}</div>
+                            <div class="review-rating">${stars}</div>
+                            <div class="review-text">${rev.text}</div>
+                            <div class="review-time">${new Date(rev.createdAt).toLocaleString()}</div>
+                        </div>
+                    `;
+                });
+            } catch(e) { console.error(e); }
+        }
+        if (!reviewsHtml) reviewsHtml = `<p>${t('no_reviews')}</p>`;
+        let name, addr, cert;
+        if (currentLang === 'zh') { name = rest.name_cn; addr = rest.address_cn; cert = rest.certification_cn; }
+        else if (currentLang === 'ar') { name = rest.name_ar || rest.name_en; addr = rest.address_ar || rest.address_en; cert = rest.certification_ar || rest.certification_en; }
+        else { name = rest.name_en; addr = rest.address_en; cert = rest.certification_en; }
         detailContent.innerHTML = `
             <h3>${name}</h3>
             <p>📍 ${addr}</p>
             <p>✅ ${cert}</p>
             <p>⭐ ${rest.rating}</p>
-            <button id="navBtn">🧭 导航</button>
+            <button id="navBtn" style="background:#2c7a4d; color:white; margin:5px;">${t('nav_btn')}</button>
+            <button id="helpBtn" style="background:#ffc107; margin:5px;">${t('help_btn')}</button>
             <hr>
-            <h4>📝 用户评价（${snapshot.size}条）</h4>
+            <h4>📝 ${t('reviews_title')}</h4>
             <div id="reviewsList">${reviewsHtml}</div>
             <div style="margin-top:16px;">
-                <textarea id="newReview" rows="2" placeholder="写下你的评价..." style="width:100%; padding:8px; border-radius:12px; border:1px solid #ddd;"></textarea>
-                <div>
-                    <span>评分：</span>
+                <textarea id="newReview" rows="2" placeholder="${t('write_review')}" style="width:100%; padding:8px; border-radius:12px; border:1px solid #ddd;"></textarea>
+                <div style="margin:8px 0;">
+                    <span>${t('rating')}</span>
                     <select id="reviewRating">
-                        <option value="5">⭐⭐⭐⭐⭐ 5星</option>
-                        <option value="4">⭐⭐⭐⭐ 4星</option>
-                        <option value="3">⭐⭐⭐ 3星</option>
-                        <option value="2">⭐⭐ 2星</option>
-                        <option value="1">⭐ 1星</option>
+                        <option value="5">⭐⭐⭐⭐⭐ 5</option>
+                        <option value="4">⭐⭐⭐⭐ 4</option>
+                        <option value="3">⭐⭐⭐ 3</option>
+                        <option value="2">⭐⭐ 2</option>
+                        <option value="1">⭐ 1</option>
                     </select>
                 </div>
-                <button id="submitReviewBtn">发表评价</button>
+                <button id="submitReviewBtn" style="background:#2c7a4d; color:white;">${t('submit_review')}</button>
             </div>
-            <button id="closeDetail">关闭</button>
+            <button id="closeDetail" style="background:#ccc; margin-top:16px;">${t('close')}</button>
         `;
-        
-        document.getElementById('navBtn').onclick = () => {
-            window.open(`https://uri.amap.com/marker?position=${rest.lng},${rest.lat}&name=${encodeURIComponent(rest.name_cn)}`);
-        };
+        document.getElementById('navBtn').onclick = () => window.open(`https://uri.amap.com/marker?position=${rest.lng},${rest.lat}&name=${encodeURIComponent(rest.name_cn)}`);
+        document.getElementById('helpBtn').onclick = () => alert(currentLang === 'ar' ? 'خدمة المرافق قريباً' : '中外互助功能即将上线');
         document.getElementById('submitReviewBtn').onclick = async () => {
             const text = document.getElementById('newReview').value.trim();
             const rating = parseInt(document.getElementById('reviewRating').value);
-            if (!text) { alert('请填写评价内容'); return; }
-            // 获取当前匿名用户的ID
+            if (!text) { alert(currentLang === 'ar' ? 'الرجاء كتابة التقييم' : '请填写评价内容'); return; }
+            if (!window.db) { alert('评价功能暂不可用'); return; }
             const userId = localStorage.getItem('anonymousId') || 'user_' + Math.random().toString(36).substr(2, 8);
             if (!localStorage.getItem('anonymousId')) localStorage.setItem('anonymousId', userId);
-            const userName = `美食家_${userId.substr(-4)}`; // 简单匿名显示
+            const userName = (currentLang === 'ar' ? 'مستخدم_' : 'User_') + userId.substr(-4);
             await addDoc(collection(window.db, `restaurants/${rest.id}/reviews`), {
-                text: text,
-                rating: rating,
-                userName: userName,
-                createdAt: new Date()
+                text, rating, userName, createdAt: new Date()
             });
-            alert('评价已提交，感谢分享！');
-            // 重新加载详情页以显示新评价
+            alert(currentLang === 'ar' ? 'تم نشر التقييم' : '评价已提交');
             showRestaurantDetail(rest);
         };
         document.getElementById('closeDetail').onclick = () => document.getElementById('detailModal').style.display = 'none';
+    }
+
+    // 支付弹窗（自动倒计时解锁）
+    let unlockCountdown = 10;
+    function showPaymentModal() {
+        const modal = document.getElementById('paymentModal');
+        const countdownMsg = document.getElementById('countdownMsg');
+        unlockCountdown = 10;
+        countdownMsg.innerText = currentLang === 'ar' ? `انتظار الدفع... سيتم الفتح تلقائياً خلال ${unlockCountdown} ثانية` : `Waiting for payment... Auto unlock in ${unlockCountdown}s`;
+        modal.style.display = 'flex';
+        if (countdownTimer) clearInterval(countdownTimer);
+        countdownTimer = setInterval(() => {
+            unlockCountdown--;
+            if (unlockCountdown <= 0) {
+                clearInterval(countdownTimer);
+                confirmPayment();
+            } else {
+                countdownMsg.innerText = currentLang === 'ar' ? `سيتم الفتح تلقائياً خلال ${unlockCountdown} ثانية` : `Auto unlock in ${unlockCountdown}s`;
+            }
+        }, 1000);
+    }
+    function confirmPayment() {
+        if (countdownTimer) clearInterval(countdownTimer);
+        isPaidUser = true;
+        localStorage.setItem('tastehome_paid', 'true');
+        document.getElementById('paymentModal').style.display = 'none';
+        displayRestaurants();
+        updateMapMarkers();
+        alert(t('confirm_msg'));
+    }
+    function cancelPayment() {
+        if (countdownTimer) clearInterval(countdownTimer);
+        document.getElementById('paymentModal').style.display = 'none';
     }
 
     // 初始化地图
@@ -245,23 +422,54 @@
         updateMapMarkers();
     }
 
-    // 等待 Firebase 初始化完成后再加载
-    window.onload = () => {
+    // 更新页面所有静态文本（包括底部footer）
+    function updateUILanguage() {
+        document.getElementById('searchInput').placeholder = t('search_placeholder');
+        const certSelect = document.getElementById('certFilter');
+        certSelect.options[0].text = t('all_cert');
+        certSelect.options[1].text = t('muslim');
+        certSelect.options[2].text = t('halal_cert');
+        document.getElementById('modalTitle').innerText = t('unlock_title');
+        document.getElementById('modalDesc').innerText = t('unlock_desc');
+        document.getElementById('cancelPayBtn').innerText = t('cancel_pay');
+        // 更新footer（简单遍历）
+        const i18nAttrs = ['about', 'about_us', 'team', 'contact', 'privacy', 'terms', 'discover', 'halal', 'indian', 'thai', 'malaysian', 'mexican', 'for_business', 'list_restaurant', 'advertise', 'coupons', 'business_login', 'support', 'help', 'volunteer', 'ambassador', 'copyright'];
+        const texts = translations[currentLang];
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (texts[key]) el.innerText = texts[key];
+        });
+        // 重新显示餐厅列表（更新按钮文字）
         displayRestaurants();
+        updateMapMarkers();
+        // 设置页面方向（阿拉伯语从右到左）
+        if (currentLang === 'ar') {
+            document.body.classList.add('arabic');
+            document.querySelectorAll('.modal-content, .restaurant-card, .footer-container').forEach(el => el.style.direction = 'rtl');
+        } else {
+            document.body.classList.remove('arabic');
+            document.querySelectorAll('.modal-content, .restaurant-card, .footer-container').forEach(el => el.style.direction = 'ltr');
+        }
+    }
+
+    // 语言切换
+    function setLanguage(lang) {
+        currentLang = lang;
+        localStorage.setItem('tastehome_lang', lang);
+        updateUILanguage();
+    }
+
+    // 页面加载
+    window.onload = () => {
+        const savedLang = localStorage.getItem('tastehome_lang') || 'en';
+        setLanguage(savedLang);
         initMap();
-        document.getElementById('langBtn').onclick = () => {
-            currentLang = currentLang === 'zh' ? 'en' : 'zh';
-            document.getElementById('langBtn').textContent = currentLang === 'zh' ? 'English' : '中文';
-            displayRestaurants();
-            updateMapMarkers();
-        };
+        document.getElementById('langSelect').value = savedLang;
+        document.getElementById('langSelect').onchange = (e) => setLanguage(e.target.value);
         document.getElementById('searchInput').oninput = () => displayRestaurants();
         document.getElementById('certFilter').onchange = () => displayRestaurants();
-        // 关闭模态框背景点击
-        window.onclick = (e) => {
-            const modal = document.getElementById('detailModal');
-            if (e.target === modal) modal.style.display = 'none';
-        };
+        document.getElementById('cancelPayBtn').onclick = cancelPayment;
+        window.showPaymentModal = showPaymentModal;
     };
 </script>
 </body>
