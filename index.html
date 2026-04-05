@@ -26,28 +26,29 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; display: flex; flex-direction: column; min-height: 100vh; }
-        /* 头部：logo 居中，右侧按钮 */
-        header { background: #2c7a4d; color: white; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 70px; position: relative; }
-        .logo-container { position: absolute; left: 50%; transform: translateX(-50%); }
-        .logo { height: 50px; object-fit: contain; display: block; }
-        .right-buttons { display: flex; gap: 12px; align-items: center; margin-left: auto; }
-        .lang-switch, .user-btn { background: white; border: none; padding: 6px 16px; border-radius: 30px; font-weight: 600; cursor: pointer; }
+        /* 头部：左中右布局，中间大标题 */
+        header { background: #2c7a4d; color: white; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 80px; position: relative; }
+        .logo-area { width: 120px; } /* 左侧占位，保持平衡 */
+        .slogan { font-size: 1.8rem; font-weight: bold; text-align: center; flex: 1; letter-spacing: 2px; }
+        .right-buttons { display: flex; gap: 12px; align-items: center; }
+        .lang-switch, .user-btn, .signup-btn { background: white; border: none; padding: 6px 16px; border-radius: 30px; font-weight: 600; cursor: pointer; }
         .lang-switch { color: #2c7a4d; }
         .user-btn { background: #ffc107; color: #1e3a2f; }
+        .signup-btn { background: transparent; border: 1px solid white; color: white; }
         /* 筛选栏标签 */
-        .filter-tabs { display: flex; gap: 12px; margin: 16px 0 20px; flex-wrap: wrap; border-bottom: 1px solid #e0e0e0; padding-bottom: 8px; }
-        .filter-tab { background: none; border: none; padding: 6px 16px; font-size: 0.9rem; font-weight: 500; color: #666; cursor: pointer; border-radius: 30px; transition: 0.2s; }
+        .filter-tabs { display: flex; gap: 12px; margin: 20px 0; flex-wrap: wrap; border-bottom: 1px solid #e0e0e0; padding-bottom: 8px; }
+        .filter-tab { background: none; border: none; padding: 8px 20px; font-size: 1rem; font-weight: 500; color: #666; cursor: pointer; border-radius: 40px; transition: 0.2s; }
         .filter-tab:hover { background: #f0f0f0; }
         .filter-tab.active { background: #2c7a4d; color: white; }
         /* 主内容 */
         main { max-width: 1200px; margin: 0 auto; padding: 0 16px; flex: 1; width: 100%; }
-        #map { height: 450px; border-radius: 20px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .restaurant-card { background: white; border-radius: 20px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; }
-        .restaurant-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
-        .restaurant-name { font-weight: 700; font-size: 1.4rem; color: #1e3a2f; }
-        .restaurant-address { font-size: 0.9rem; color: #5a6e5c; margin-top: 6px; }
-        .restaurant-meta { font-size: 0.8rem; color: #b86b2c; display: inline-block; background: #fef2e0; padding: 4px 12px; border-radius: 30px; margin-top: 10px; }
-        .unlock-btn { background: #ffc107; color: #1e3a2f; border: none; padding: 14px 20px; border-radius: 40px; font-weight: bold; font-size: 1rem; cursor: pointer; width: 100%; margin-top: 20px; }
+        #map { height: 500px; border-radius: 24px; margin-bottom: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .restaurant-card { background: white; border-radius: 24px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; }
+        .restaurant-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.1); }
+        .restaurant-name { font-weight: 700; font-size: 1.6rem; color: #1e3a2f; }
+        .restaurant-address { font-size: 1rem; color: #5a6e5c; margin-top: 8px; }
+        .restaurant-meta { font-size: 0.9rem; color: #b86b2c; display: inline-block; background: #fef2e0; padding: 6px 14px; border-radius: 40px; margin-top: 12px; }
+        .unlock-btn { background: #ffc107; color: #1e3a2f; border: none; padding: 14px 20px; border-radius: 40px; font-weight: bold; font-size: 1.1rem; cursor: pointer; width: 100%; margin-top: 24px; }
         /* 弹窗 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 2000; }
         .modal-content { background: white; padding: 28px; border-radius: 32px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; text-align: center; }
@@ -63,24 +64,25 @@
         .footer-col a { color: #666; text-decoration: none; font-size: 0.85rem; }
         .footer-col a:hover { color: #2c7a4d; text-decoration: underline; }
         .copyright { text-align: center; padding-top: 30px; font-size: 0.75rem; color: #888; border-top: 1px solid #ddd; margin-top: 30px; }
-        @media (max-width: 768px) { .filter-tabs { gap: 8px; } .filter-tab { padding: 4px 12px; font-size: 0.8rem; } }
-        @media (max-width: 600px) { #map { height: 320px; } header { height: 60px; } .logo { height: 40px; } }
+        @media (max-width: 768px) { .slogan { font-size: 1.2rem; } .filter-tab { padding: 6px 12px; font-size: 0.8rem; } }
+        @media (max-width: 600px) { #map { height: 350px; } header { height: 60px; } .restaurant-name { font-size: 1.2rem; } }
         /* 阿拉伯语从右到左 */
         .arabic { direction: rtl; font-family: 'Segoe UI', 'Tahoma', sans-serif; }
+        .arabic .slogan { font-family: inherit; }
     </style>
 </head>
 <body>
 
 <header>
-    <div class="logo-container">
-        <img src="logo-simple.png" alt="TasteHome" class="logo">
-    </div>
+    <div class="logo-area"></div>
+    <div class="slogan" id="slogan">找到家乡味</div>
     <div class="right-buttons">
         <select id="langSelect" class="lang-switch">
             <option value="en">English</option>
             <option value="zh">中文</option>
             <option value="ar">العربية</option>
         </select>
+        <button id="signupBtn" class="signup-btn">Sign Up</button>
         <button id="userBtn" class="user-btn">Login</button>
     </div>
 </header>
@@ -114,15 +116,15 @@
     </div>
 </div>
 
-<!-- 登录/注册弹窗 -->
+<!-- 登录/注册弹窗（二合一） -->
 <div id="authModal" class="modal">
     <div class="modal-content">
-        <h3 id="authTitle">Login</h3>
+        <h3 id="authTitle">Login / Sign Up</h3>
         <input type="text" id="username" placeholder="Username" style="width:100%; margin:10px 0; padding:10px; border-radius:30px; border:1px solid #ddd;">
-        <input type="password" id="password" placeholder="Password" style="width:100%; margin:10px 0; padding:10px; border-radius:30px; border:1px solid #ddd;">
-        <button id="authSubmitBtn" style="background:#2c7a4d; color:white; padding:8px 20px; border-radius:30px;">Login</button>
+        <input type="password" id="password" placeholder="Password (any)" style="width:100%; margin:10px 0; padding:10px; border-radius:30px; border:1px solid #ddd;">
+        <button id="authSubmitBtn" style="background:#2c7a4d; color:white; padding:8px 20px; border-radius:30px;">Login / Sign Up</button>
         <button id="closeAuthBtn" style="background:#ccc; margin-top:10px;">Close</button>
-        <p style="margin-top:12px; font-size:0.8rem;">Demo: any username/password</p>
+        <p style="margin-top:12px; font-size:0.8rem;">Demo: any username/password works</p>
     </div>
 </div>
 
@@ -162,9 +164,9 @@
 
     // 多语言文本
     const translations = {
-        en: { unlock_btn: "🔓 Unlock All Restaurants (¥9.9)", unlock_title: "Unlock All Restaurants", unlock_desc: "Pay ¥9.9 to get full access", confirm_msg: "✓ Payment confirmed! All restaurants unlocked.", search_placeholder: "Search restaurants...", all: "All", price: "Price", open_now: "Open Now", reservations: "Reservations", nav_btn: "🧭 Navigate", help_btn: "🙋 Ask for Companion", reviews_title: "User Reviews", no_reviews: "No reviews yet. Be the first!", write_review: "Write your review...", submit_review: "Submit Review", rating: "Rating:", close: "Close", login_title: "Login", login_demo: "Demo: any username/password", login_btn: "Login", logout: "Logout" },
-        zh: { unlock_btn: "🔓 解锁全部餐厅 (¥9.9)", unlock_title: "解锁全部餐厅", unlock_desc: "支付 ¥9.9 解锁全部清真餐厅", confirm_msg: "✓ 支付已确认！已解锁全部餐厅。", search_placeholder: "搜索餐厅...", all: "全部", price: "价格", open_now: "营业中", reservations: "可预订", nav_btn: "🧭 导航", help_btn: "🙋 求带", reviews_title: "用户评价", no_reviews: "暂无评价，快来发表第一条吧！", write_review: "写下你的评价...", submit_review: "发表评价", rating: "评分：", close: "关闭", login_title: "登录", login_demo: "演示：任意用户名/密码", login_btn: "登录", logout: "退出" },
-        ar: { unlock_btn: "🔓 فتح جميع المطاعم (¥9.9)", unlock_title: "فتح جميع المطاعم", unlock_desc: "ادفع ¥9.9 للوصول الكامل", confirm_msg: "✓ تم تأكيد الدفع! تم فتح جميع المطاعم.", search_placeholder: "ابحث عن مطعم...", all: "الكل", price: "السعر", open_now: "مفتوح الآن", reservations: "حجز", nav_btn: "🧭 ملاحة", help_btn: "🙋 طلب مرافق", reviews_title: "تقييمات المستخدمين", no_reviews: "لا توجد تقييمات بعد. كن الأول!", write_review: "اكتب تقييمك...", submit_review: "نشر التقييم", rating: "التقييم:", close: "إغلاق", login_title: "تسجيل الدخول", login_demo: "تجريبي: أي اسم مستخدم/كلمة مرور", login_btn: "دخول", logout: "تسجيل خروج" }
+        en: { slogan: "Find Your Taste of Home", unlock_btn: "🔓 Unlock All Restaurants (¥9.9)", unlock_title: "Unlock All Restaurants", unlock_desc: "Pay ¥9.9 to get full access", confirm_msg: "✓ Payment confirmed! All restaurants unlocked.", all: "All", price: "Price", open_now: "Open Now", reservations: "Reservations", nav_btn: "🧭 Navigate", help_btn: "🙋 Ask for Companion", reviews_title: "User Reviews", no_reviews: "No reviews yet. Be the first!", write_review: "Write your review...", submit_review: "Submit Review", rating: "Rating:", close: "Close", auth_title: "Login / Sign Up", auth_btn: "Login / Sign Up", login_btn: "Login", signup_btn: "Sign Up", logout: "Logout" },
+        zh: { slogan: "找到家乡味", unlock_btn: "🔓 解锁全部餐厅 (¥9.9)", unlock_title: "解锁全部餐厅", unlock_desc: "支付 ¥9.9 解锁全部清真餐厅", confirm_msg: "✓ 支付已确认！已解锁全部餐厅。", all: "全部", price: "价格", open_now: "营业中", reservations: "可预订", nav_btn: "🧭 导航", help_btn: "🙋 求带", reviews_title: "用户评价", no_reviews: "暂无评价，快来发表第一条吧！", write_review: "写下你的评价...", submit_review: "发表评价", rating: "评分：", close: "关闭", auth_title: "登录 / 注册", auth_btn: "登录 / 注册", login_btn: "登录", signup_btn: "注册", logout: "退出" },
+        ar: { slogan: "ابحث عن طعم المنزل", unlock_btn: "🔓 فتح جميع المطاعم (¥9.9)", unlock_title: "فتح جميع المطاعم", unlock_desc: "ادفع ¥9.9 للوصول الكامل", confirm_msg: "✓ تم تأكيد الدفع! تم فتح جميع المطاعم.", all: "الكل", price: "السعر", open_now: "مفتوح الآن", reservations: "حجز", nav_btn: "🧭 ملاحة", help_btn: "🙋 طلب مرافق", reviews_title: "تقييمات المستخدمين", no_reviews: "لا توجد تقييمات بعد. كن الأول!", write_review: "اكتب تقييمك...", submit_review: "نشر التقييم", rating: "التقييم:", close: "إغلاق", auth_title: "تسجيل الدخول / الاشتراك", auth_btn: "دخول / اشتراك", login_btn: "دخول", signup_btn: "اشتراك", logout: "تسجيل خروج" }
     };
     function t(key) { return translations[currentLang][key] || key; }
 
@@ -175,7 +177,6 @@
     function filterRestaurants(restaurants) {
         let filtered = [...restaurants];
         if (currentFilter === 'price') {
-            // 演示：按价格排序（低到高），简单模拟
             const priceOrder = { "¥":1, "¥¥":2, "¥¥¥":3, "¥¥¥¥":4 };
             filtered.sort((a,b) => (priceOrder[a.price_level]||0) - (priceOrder[b.price_level]||0));
         } else if (currentFilter === 'open') {
@@ -303,22 +304,31 @@
         alert(t('confirm_msg'));
     }
 
-    // 登录/注册
+    // 登录/注册（统一处理）
     function showAuthModal() { document.getElementById('authModal').style.display = 'flex'; }
     function closeAuthModal() { document.getElementById('authModal').style.display = 'none'; }
-    function handleLogin() {
+    function handleAuth() {
         const username = document.getElementById('username').value.trim();
         if (!username) { alert('Please enter username'); return; }
         currentUser = username;
         localStorage.setItem('tastehome_user', username);
-        document.getElementById('userBtn').innerText = currentUser;
+        updateUserUI();
         closeAuthModal();
         alert(`Welcome ${currentUser}!`);
     }
     function logout() {
         currentUser = null;
         localStorage.removeItem('tastehome_user');
-        document.getElementById('userBtn').innerText = t('login_btn');
+        updateUserUI();
+    }
+    function updateUserUI() {
+        if (currentUser) {
+            document.getElementById('userBtn').innerText = currentUser;
+            document.getElementById('signupBtn').style.display = 'none';
+        } else {
+            document.getElementById('userBtn').innerText = t('login_btn');
+            document.getElementById('signupBtn').style.display = 'inline-block';
+        }
     }
 
     // 初始化地图
@@ -339,13 +349,16 @@
         currentLang = lang;
         localStorage.setItem('tastehome_lang', lang);
         document.getElementById('langSelect').value = lang;
-        // 更新所有文字
-        document.getElementById('userBtn').innerText = currentUser ? currentUser : t('login_btn');
+        // 更新标题
+        document.getElementById('slogan').innerText = t('slogan');
         document.getElementById('modalTitle').innerText = t('unlock_title');
         document.getElementById('modalDesc').innerText = t('unlock_desc');
-        document.getElementById('authTitle').innerText = t('login_title');
-        document.getElementById('authSubmitBtn').innerText = t('login_btn');
-        // 更新筛选标签文字
+        document.getElementById('authTitle').innerText = t('auth_title');
+        document.getElementById('authSubmitBtn').innerText = t('auth_btn');
+        // 更新按钮文字
+        if (!currentUser) document.getElementById('userBtn').innerText = t('login_btn');
+        document.getElementById('signupBtn').innerText = t('signup_btn');
+        // 筛选标签文字
         const tabs = document.querySelectorAll('.filter-tab');
         if (tabs.length >= 4) {
             tabs[0].innerText = t('all');
@@ -378,10 +391,12 @@
         // 事件绑定
         document.getElementById('langSelect').onchange = (e) => setLanguage(e.target.value);
         document.getElementById('userBtn').onclick = () => currentUser ? logout() : showAuthModal();
+        document.getElementById('signupBtn').onclick = showAuthModal;
         document.getElementById('confirmPayBtn').onclick = confirmPayment;
         document.getElementById('closeModalBtn').onclick = closePaymentModal;
-        document.getElementById('authSubmitBtn').onclick = handleLogin;
+        document.getElementById('authSubmitBtn').onclick = handleAuth;
         document.getElementById('closeAuthBtn').onclick = closeAuthModal;
+        updateUserUI();
         window.showPaymentModal = showPaymentModal;
     };
 </script>
