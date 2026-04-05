@@ -4,13 +4,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>TasteHome - 国际美食地图</title>
+    <!-- Firebase SDK -->
+    <script type="module">
+        // 在这里粘贴你的 firebaseConfig（从 Firebase 控制台复制）
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        // 初始化 Firebase
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        // 匿名登录，让每个用户有唯一ID，无需注册（简化操作）
+        signInAnonymously(auth).catch(error => console.error("匿名登录失败", error));
+        
+        window.db = db;
+        window.auth = auth;
+    </script>
+    <!-- 高德地图 API -->
+    <script src="https://webapi.amap.com/maps?v=2.0&key=b0ed148e34bc74e1b2f77fbda7e2926d&plugin=AMap.Scale,AMap.ToolBar"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; }
         header { background: #2c7a4d; color: white; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; height: 70px; gap: 10px; }
         .logo { height: 100%; max-height: 60px; object-fit: contain; }
-        .lang-switch, .user-btn { background: white; border: none; padding: 6px 16px; border-radius: 30px; font-weight: 600; color: #2c7a4d; cursor: pointer; }
-        .user-btn { background: #ffc107; color: #1e3a2f; }
+        .lang-switch { background: white; border: none; padding: 6px 16px; border-radius: 30px; font-weight: 600; color: #2c7a4d; cursor: pointer; }
         main { max-width: 1200px; margin: 16px auto; padding: 0 16px; }
         #map { height: 400px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
         .search-filter { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -24,25 +51,26 @@
         .favorite-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #ccc; }
         .favorite-btn.active { color: #e74c3c; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 2000; }
-        .modal-content { background: white; padding: 24px; border-radius: 28px; max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal-content { background: white; padding: 24px; border-radius: 28px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .review-item { border-bottom: 1px solid #eee; padding: 12px 0; }
+        .review-user { font-weight: bold; }
+        .review-rating { color: #ffc107; }
+        .review-text { margin-top: 6px; color: #333; }
+        .review-time { font-size: 0.7rem; color: #999; margin-top: 4px; }
+        button { background: #2c7a4d; color: white; border: none; padding: 8px 16px; border-radius: 30px; cursor: pointer; margin: 5px; }
         .footer { text-align: center; margin: 30px 0 20px; font-size: 12px; color: #8b9a8b; }
         @media (max-width: 600px) { #map { height: 300px; } header { height: 60px; } }
     </style>
-    <!-- 高德地图 API -->
-    <script src="https://webapi.amap.com/maps?v=2.0&key=b0ed148e34bc74e1b2f77fbda7e2926d&plugin=AMap.Scale,AMap.ToolBar"></script>
 </head>
 <body>
 <header>
     <img src="logo-simple.png" alt="TasteHome" class="logo">
-    <div>
-        <button id="langBtn" class="lang-switch">中文</button>
-        <button id="userBtn" class="user-btn">登录</button>
-    </div>
+    <button id="langBtn" class="lang-switch">中文</button>
 </header>
 <main>
     <div id="map"></div>
     <div class="search-filter">
-        <input type="text" id="searchInput" placeholder="搜索餐厅..." style="background:white;">
+        <input type="text" id="searchInput" placeholder="搜索餐厅...">
         <select id="certFilter">
             <option value="">所有认证</option>
             <option value="穆斯林经营">穆斯林经营</option>
@@ -52,19 +80,7 @@
     <div id="restaurantList"></div>
 </main>
 <div class="footer">
-    <p>📍 点击餐厅查看详情 | 登录后可以收藏、评价</p>
-</div>
-
-<!-- 登录/注册弹窗 -->
-<div id="authModal" class="modal">
-    <div class="modal-content">
-        <h3 id="authTitle">登录</h3>
-        <input type="email" id="email" placeholder="邮箱" style="width:100%; margin:10px 0; padding:8px;">
-        <input type="password" id="password" placeholder="密码" style="width:100%; margin:10px 0; padding:8px;">
-        <button id="authSubmitBtn" style="background:#2c7a4d; color:white; padding:8px 16px; border:none; border-radius:30px; margin:5px;">登录</button>
-        <button id="toggleAuthBtn" style="background:#ccc; border:none; padding:8px 16px; border-radius:30px;">没有账号？注册</button>
-        <button id="closeAuthBtn" style="background:#ccc; border:none; padding:8px 16px; border-radius:30px;">关闭</button>
-    </div>
+    <p>📍 点击餐厅查看详情、发表评价 | 所有人可见</p>
 </div>
 
 <!-- 餐厅详情弹窗 -->
@@ -73,7 +89,7 @@
 </div>
 
 <script>
-    // ==================== 餐厅数据（共6家）====================
+    // 餐厅数据（6家）
     const restaurantsData = [
         { id: 1, name_cn: "兰州拉面（仓前店）", name_en: "Lanzhou Noodles (Cangqian)", lat: 30.28621, lng: 120.019159, address_cn: "余杭区仓前街道", address_en: "Cangqian Street", certification_cn: "穆斯林经营", certification_en: "Muslim-owned", rating: 4.3 },
         { id: 2, name_cn: "疆厨子·抓饭·烤肉", name_en: "Jiang Kitchen - Rice & BBQ", lat: 30.274897, lng: 120.021742, address_cn: "余杭区仓前街道", address_en: "Cangqian Street", certification_cn: "清真认证", certification_en: "Halal Certified", rating: 4.5 },
@@ -86,44 +102,22 @@
     let currentLang = 'en';
     let map = null;
     let markers = [];
-    let currentUser = null;   // 模拟登录用户，实际可用 localStorage 保存状态
-    let favorites = new Set(); // 存储收藏的餐厅id
+    let currentUserId = null;
 
-    // 本地存储模拟登录和收藏（不依赖 Firebase，纯前端演示）
-    function loadFromLocal() {
-        const savedUser = localStorage.getItem('tastehome_user');
-        if (savedUser) {
-            currentUser = JSON.parse(savedUser);
-            document.getElementById('userBtn').textContent = currentUser.email.split('@')[0];
-        }
-        const savedFav = localStorage.getItem('tastehome_favorites');
-        if (savedFav) {
-            favorites = new Set(JSON.parse(savedFav));
-        }
-        displayRestaurants();
-        updateMapMarkers();
-    }
-    function saveFavorites() {
-        localStorage.setItem('tastehome_favorites', JSON.stringify([...favorites]));
-    }
-
+    // 辅助函数
     function t(zh, en) { return currentLang === 'zh' ? zh : en; }
 
+    // 显示餐厅列表
     function displayRestaurants() {
         const container = document.getElementById('restaurantList');
-        if (!container) return;
         container.innerHTML = '';
         let filtered = [...restaurantsData];
         const keyword = document.getElementById('searchInput').value.toLowerCase();
-        if (keyword) {
-            filtered = filtered.filter(r => r.name_cn.includes(keyword) || r.name_en.toLowerCase().includes(keyword));
-        }
+        if (keyword) filtered = filtered.filter(r => r.name_cn.includes(keyword) || r.name_en.toLowerCase().includes(keyword));
         const cert = document.getElementById('certFilter').value;
-        if (cert) {
-            filtered = filtered.filter(r => r.certification_cn === cert);
-        }
-        // 免费版显示前3家，付费用户显示全部（这里简单模拟：登录即付费）
-        const displayList = currentUser ? filtered : filtered.slice(0, 3);
+        if (cert) filtered = filtered.filter(r => r.certification_cn === cert);
+        // 免费版显示前3家，为演示，我们全部显示（因为还没做付费）
+        const displayList = filtered;
         displayList.forEach(rest => {
             const card = document.createElement('div');
             card.className = 'restaurant-card';
@@ -136,36 +130,18 @@
                     <div class="restaurant-address">📍 ${addr}</div>
                     <div class="restaurant-meta">✅ ${certText}</div>
                 </div>
-                <button class="favorite-btn ${favorites.has(rest.id) ? 'active' : ''}" data-id="${rest.id}">❤️</button>
             `;
-            card.addEventListener('click', (e) => {
-                if (e.target.classList.contains('favorite-btn')) return;
-                showRestaurantDetail(rest);
-            });
-            const favBtn = card.querySelector('.favorite-btn');
-            favBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (!currentUser) { alert('请先登录'); showAuthModal(); return; }
-                const id = rest.id;
-                if (favorites.has(id)) {
-                    favorites.delete(id);
-                    favBtn.classList.remove('active');
-                } else {
-                    favorites.add(id);
-                    favBtn.classList.add('active');
-                }
-                saveFavorites();
-            });
+            card.onclick = () => showRestaurantDetail(rest);
             container.appendChild(card);
         });
     }
 
+    // 更新地图标记
     function updateMapMarkers() {
         if (!map) return;
         markers.forEach(m => m.setMap(null));
         markers = [];
-        const displayList = currentUser ? restaurantsData : restaurantsData.slice(0, 3);
-        displayList.forEach(rest => {
+        restaurantsData.forEach(rest => {
             const marker = new AMap.Marker({
                 position: [rest.lng, rest.lat],
                 map: map,
@@ -177,46 +153,83 @@
         if (markers.length) map.setFitView(markers);
     }
 
-    function showRestaurantDetail(rest) {
+    // 显示餐厅详情并加载评价
+    async function showRestaurantDetail(rest) {
         const detailContent = document.getElementById('detailContent');
-        detailContent.innerHTML = `
-            <h3>${currentLang === 'en' ? rest.name_en : rest.name_cn}</h3>
-            <p>📍 ${currentLang === 'en' ? rest.address_en : rest.address_cn}</p>
-            <p>✅ ${currentLang === 'en' ? rest.certification_en : rest.certification_cn}</p>
-            <p>⭐ ${rest.rating}</p>
-            <button id="navBtn" style="background:#2c7a4d; color:white; border:none; padding:8px 16px; border-radius:30px; margin:5px;">🧭 导航</button>
-            <button id="helpBtn" style="background:#ffc107; border:none; padding:8px 16px; border-radius:30px;">🙋 求带</button>
-            <hr>
-            <h4>📝 用户评价</h4>
-            <div id="reviewsList"><p>暂无评价，快来发表你的体验吧！</p></div>
-            ${currentUser ? `<textarea id="reviewText" placeholder="写下你的评价..." rows="2" style="width:100%; margin:10px 0;"></textarea>
-            <select id="reviewRating"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select>
-            <button id="submitReview" style="background:#2c7a4d; color:white; border:none; padding:8px 16px; border-radius:30px;">发表评价</button>` : '<p><a href="#" id="loginToReview">登录后发表评价</a></p>'}
-            <button id="closeDetail" style="background:#ccc; border:none; padding:8px 16px; border-radius:30px; margin-top:10px;">关闭</button>
-        `;
+        detailContent.innerHTML = `<div style="text-align:center">加载中...</div>`;
         document.getElementById('detailModal').style.display = 'flex';
+        
+        // 从 Firestore 读取该餐厅的评价
+        const reviewsRef = collection(window.db, `restaurants/${rest.id}/reviews`);
+        const q = query(reviewsRef, orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        let reviewsHtml = '';
+        snapshot.forEach(doc => {
+            const rev = doc.data();
+            const stars = '★'.repeat(rev.rating) + '☆'.repeat(5-rev.rating);
+            reviewsHtml += `
+                <div class="review-item">
+                    <div class="review-user">${rev.userName || '匿名用户'}</div>
+                    <div class="review-rating">${stars}</div>
+                    <div class="review-text">${rev.text}</div>
+                    <div class="review-time">${new Date(rev.createdAt).toLocaleString()}</div>
+                </div>
+            `;
+        });
+        if (!reviewsHtml) reviewsHtml = '<p>暂无评价，快来发表第一条评价吧！</p>';
+        
+        const name = currentLang === 'en' ? rest.name_en : rest.name_cn;
+        const addr = currentLang === 'en' ? rest.address_en : rest.address_cn;
+        const cert = currentLang === 'en' ? rest.certification_en : rest.certification_cn;
+        
+        detailContent.innerHTML = `
+            <h3>${name}</h3>
+            <p>📍 ${addr}</p>
+            <p>✅ ${cert}</p>
+            <p>⭐ ${rest.rating}</p>
+            <button id="navBtn">🧭 导航</button>
+            <hr>
+            <h4>📝 用户评价（${snapshot.size}条）</h4>
+            <div id="reviewsList">${reviewsHtml}</div>
+            <div style="margin-top:16px;">
+                <textarea id="newReview" rows="2" placeholder="写下你的评价..." style="width:100%; padding:8px; border-radius:12px; border:1px solid #ddd;"></textarea>
+                <div>
+                    <span>评分：</span>
+                    <select id="reviewRating">
+                        <option value="5">⭐⭐⭐⭐⭐ 5星</option>
+                        <option value="4">⭐⭐⭐⭐ 4星</option>
+                        <option value="3">⭐⭐⭐ 3星</option>
+                        <option value="2">⭐⭐ 2星</option>
+                        <option value="1">⭐ 1星</option>
+                    </select>
+                </div>
+                <button id="submitReviewBtn">发表评价</button>
+            </div>
+            <button id="closeDetail">关闭</button>
+        `;
+        
         document.getElementById('navBtn').onclick = () => {
             window.open(`https://uri.amap.com/marker?position=${rest.lng},${rest.lat}&name=${encodeURIComponent(rest.name_cn)}`);
         };
-        document.getElementById('helpBtn').onclick = () => {
-            alert('中外互助功能即将上线，你可以发布“求带”需求，本地志愿者会陪你一起去餐厅！');
+        document.getElementById('submitReviewBtn').onclick = async () => {
+            const text = document.getElementById('newReview').value.trim();
+            const rating = parseInt(document.getElementById('reviewRating').value);
+            if (!text) { alert('请填写评价内容'); return; }
+            // 获取当前匿名用户的ID
+            const userId = localStorage.getItem('anonymousId') || 'user_' + Math.random().toString(36).substr(2, 8);
+            if (!localStorage.getItem('anonymousId')) localStorage.setItem('anonymousId', userId);
+            const userName = `美食家_${userId.substr(-4)}`; // 简单匿名显示
+            await addDoc(collection(window.db, `restaurants/${rest.id}/reviews`), {
+                text: text,
+                rating: rating,
+                userName: userName,
+                createdAt: new Date()
+            });
+            alert('评价已提交，感谢分享！');
+            // 重新加载详情页以显示新评价
+            showRestaurantDetail(rest);
         };
-        if (currentUser) {
-            document.getElementById('submitReview').onclick = () => {
-                const text = document.getElementById('reviewText').value;
-                if (!text) return alert('请输入评价内容');
-                alert('评价已提交（演示版）');
-                document.getElementById('detailModal').style.display = 'none';
-            };
-        } else {
-            const loginLink = document.getElementById('loginToReview');
-            if (loginLink) loginLink.onclick = (e) => { e.preventDefault(); showAuthModal(); document.getElementById('detailModal').style.display = 'none'; };
-        }
         document.getElementById('closeDetail').onclick = () => document.getElementById('detailModal').style.display = 'none';
-    }
-
-    function showAuthModal() {
-        document.getElementById('authModal').style.display = 'flex';
     }
 
     // 初始化地图
@@ -232,66 +245,22 @@
         updateMapMarkers();
     }
 
-    // 页面加载
+    // 等待 Firebase 初始化完成后再加载
     window.onload = () => {
-        loadFromLocal();
+        displayRestaurants();
         initMap();
-
-        // 语言切换
         document.getElementById('langBtn').onclick = () => {
             currentLang = currentLang === 'zh' ? 'en' : 'zh';
             document.getElementById('langBtn').textContent = currentLang === 'zh' ? 'English' : '中文';
             displayRestaurants();
             updateMapMarkers();
         };
-        // 用户按钮
-        document.getElementById('userBtn').onclick = () => {
-            if (currentUser) {
-                if (confirm('是否退出登录？')) {
-                    localStorage.removeItem('tastehome_user');
-                    localStorage.removeItem('tastehome_favorites');
-                    currentUser = null;
-                    favorites.clear();
-                    document.getElementById('userBtn').textContent = '登录';
-                    displayRestaurants();
-                    updateMapMarkers();
-                }
-            } else {
-                showAuthModal();
-            }
-        };
-        // 搜索筛选
         document.getElementById('searchInput').oninput = () => displayRestaurants();
         document.getElementById('certFilter').onchange = () => displayRestaurants();
-
-        // 登录弹窗逻辑
-        const authModal = document.getElementById('authModal');
-        let isLogin = true;
-        document.getElementById('toggleAuthBtn').onclick = () => {
-            isLogin = !isLogin;
-            document.getElementById('authTitle').textContent = isLogin ? '登录' : '注册';
-            document.getElementById('authSubmitBtn').textContent = isLogin ? '登录' : '注册';
-            document.getElementById('toggleAuthBtn').textContent = isLogin ? '没有账号？注册' : '已有账号？登录';
-        };
-        document.getElementById('authSubmitBtn').onclick = () => {
-            const email = document.getElementById('email').value;
-            const pwd = document.getElementById('password').value;
-            if (!email || !pwd) { alert('请输入邮箱和密码'); return; }
-            if (!isLogin && pwd.length < 6) { alert('密码至少6位'); return; }
-            // 模拟登录/注册：保存用户信息到本地
-            currentUser = { email: email };
-            localStorage.setItem('tastehome_user', JSON.stringify(currentUser));
-            document.getElementById('userBtn').textContent = email.split('@')[0];
-            authModal.style.display = 'none';
-            displayRestaurants();
-            updateMapMarkers();
-            alert(isLogin ? '登录成功！' : '注册成功！已自动登录');
-        };
-        document.getElementById('closeAuthBtn').onclick = () => authModal.style.display = 'none';
-        // 点击模态框背景关闭
+        // 关闭模态框背景点击
         window.onclick = (e) => {
-            if (e.target === authModal) authModal.style.display = 'none';
-            if (e.target === document.getElementById('detailModal')) document.getElementById('detailModal').style.display = 'none';
+            const modal = document.getElementById('detailModal');
+            if (e.target === modal) modal.style.display = 'none';
         };
     };
 </script>
