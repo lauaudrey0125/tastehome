@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>TasteHome - 国际美食地图 | 找到你的家乡味</title>
-    <!-- Firebase SDK (评价系统) -->
+    <title>TasteHome - 国际美食地图</title>
+    <!-- Firebase SDK (用于评价系统) -->
     <script type="module">
-        // 请替换为你的 Firebase 配置
+        // 请替换为你的 Firebase 配置（如果不需要评价功能，可删除整个 script）
         const firebaseConfig = {
             apiKey: "YOUR_API_KEY",
             authDomain: "YOUR_PROJECT.firebaseapp.com",
@@ -17,244 +17,373 @@
         };
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
         import { getFirestore, collection, addDoc, getDocs, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-        import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const auth = getAuth(app);
-        signInAnonymously(auth).catch(e => console.error);
         window.db = db;
     </script>
     <!-- 高德地图 API -->
     <script src="https://webapi.amap.com/maps?v=2.0&key=b0ed148e34bc74e1b2f77fbda7e2926d&plugin=AMap.Scale,AMap.ToolBar"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif; background: #f8f9fa; }
-        /* 头部 */
-        .hero { background: linear-gradient(135deg, #2c7a4d 0%, #1e5a3a 100%); color: white; padding: 60px 20px; text-align: center; }
-        .hero h1 { font-size: 3rem; margin-bottom: 10px; }
-        .hero p { font-size: 1.2rem; opacity: 0.9; }
-        .search-bar { max-width: 600px; margin: 20px auto 0; display: flex; gap: 10px; }
-        .search-bar input { flex: 1; padding: 14px 20px; border-radius: 40px; border: none; font-size: 1rem; }
-        .search-bar button { background: #ffc107; border: none; padding: 14px 28px; border-radius: 40px; font-weight: bold; cursor: pointer; }
-        /* 导航 */
-        .nav-bar { background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
-        .logo-img { height: 50px; }
-        .lang-select { background: #f0f0f0; border: none; padding: 8px 16px; border-radius: 30px; cursor: pointer; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8f9fa; display: flex; flex-direction: column; min-height: 100vh; }
+        /* 头部：logo 居中，右侧按钮 */
+        header { background: #2c7a4d; color: white; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 70px; position: relative; }
+        .logo-container { position: absolute; left: 50%; transform: translateX(-50%); }
+        .logo { height: 50px; object-fit: contain; display: block; }
+        .right-buttons { display: flex; gap: 12px; align-items: center; margin-left: auto; }
+        .lang-switch, .user-btn { background: white; border: none; padding: 6px 16px; border-radius: 30px; font-weight: 600; cursor: pointer; }
+        .lang-switch { color: #2c7a4d; }
+        .user-btn { background: #ffc107; color: #1e3a2f; }
+        /* 筛选栏标签 */
+        .filter-tabs { display: flex; gap: 12px; margin: 16px 0 20px; flex-wrap: wrap; border-bottom: 1px solid #e0e0e0; padding-bottom: 8px; }
+        .filter-tab { background: none; border: none; padding: 6px 16px; font-size: 0.9rem; font-weight: 500; color: #666; cursor: pointer; border-radius: 30px; transition: 0.2s; }
+        .filter-tab:hover { background: #f0f0f0; }
+        .filter-tab.active { background: #2c7a4d; color: white; }
         /* 主内容 */
-        .container { max-width: 1400px; margin: 0 auto; padding: 30px 20px; }
-        /* 地图区域 */
-        .map-section { margin-bottom: 40px; }
-        .map-section h2 { font-size: 1.8rem; margin-bottom: 15px; color: #1e3a2f; }
-        #map { height: 550px; border-radius: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        /* 筛选栏 */
-        .filters { display: flex; gap: 15px; margin: 25px 0; flex-wrap: wrap; align-items: center; }
-        .filters input, .filters select { padding: 12px 20px; border-radius: 40px; border: 1px solid #ddd; font-size: 1rem; background: white; flex: 1; min-width: 200px; }
-        /* 餐厅列表网格（仿Yelp卡片） */
-        .restaurant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 25px; margin-top: 20px; }
-        .restaurant-card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
-        .restaurant-card:hover { transform: translateY(-5px); box-shadow: 0 8px 20px rgba(0,0,0,0.12); }
-        .card-img { height: 180px; background: #e9ecef; display: flex; align-items: center; justify-content: center; color: #adb5bd; font-size: 2rem; }
-        .card-content { padding: 18px; }
-        .restaurant-name { font-size: 1.5rem; font-weight: 700; color: #1e3a2f; margin-bottom: 8px; }
-        .restaurant-address { font-size: 0.95rem; color: #5a6e5c; margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
-        .restaurant-meta { display: inline-block; background: #fef2e0; padding: 4px 12px; border-radius: 30px; font-size: 0.8rem; color: #b86b2c; margin-top: 8px; }
-        .rating { color: #f4b400; margin-top: 8px; font-weight: 500; }
-        .unlock-banner { background: #fff3e0; border-radius: 20px; padding: 25px; text-align: center; margin-top: 30px; border: 1px solid #ffe0a3; }
-        .unlock-btn { background: #ffc107; color: #1e3a2f; border: none; padding: 14px 32px; border-radius: 50px; font-weight: bold; font-size: 1.2rem; cursor: pointer; transition: 0.2s; }
-        .unlock-btn:hover { background: #ffb300; transform: scale(1.02); }
+        main { max-width: 1200px; margin: 0 auto; padding: 0 16px; flex: 1; width: 100%; }
+        #map { height: 450px; border-radius: 20px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .restaurant-card { background: white; border-radius: 20px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; }
+        .restaurant-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        .restaurant-name { font-weight: 700; font-size: 1.4rem; color: #1e3a2f; }
+        .restaurant-address { font-size: 0.9rem; color: #5a6e5c; margin-top: 6px; }
+        .restaurant-meta { font-size: 0.8rem; color: #b86b2c; display: inline-block; background: #fef2e0; padding: 4px 12px; border-radius: 30px; margin-top: 10px; }
+        .unlock-btn { background: #ffc107; color: #1e3a2f; border: none; padding: 14px 20px; border-radius: 40px; font-weight: bold; font-size: 1rem; cursor: pointer; width: 100%; margin-top: 20px; }
         /* 弹窗 */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; z-index: 2000; }
-        .modal-content { background: white; padding: 30px; border-radius: 32px; max-width: 600px; width: 90%; max-height: 85vh; overflow-y: auto; }
-        .qr-box { text-align: center; margin: 20px 0; }
-        .qr-box img { width: 220px; height: auto; border-radius: 16px; }
-        .review-item { border-bottom: 1px solid #eee; padding: 15px 0; }
-        /* 底部仿Yelp */
-        footer { background: #f2f2f2; padding: 50px 20px 30px; margin-top: 60px; }
-        .footer-container { max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 40px; }
-        .footer-col h4 { font-size: 1.1rem; margin-bottom: 20px; color: #333; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 2000; }
+        .modal-content { background: white; padding: 28px; border-radius: 32px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; text-align: center; }
+        .qr-box img { width: 200px; height: auto; margin: 16px auto; border-radius: 16px; }
+        .review-item { border-bottom: 1px solid #eee; padding: 14px 0; text-align: left; }
+        /* 底部 */
+        footer { background: #f2f2f2; padding: 40px 20px 20px; margin-top: 60px; border-top: 1px solid #ddd; }
+        .footer-container { max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 30px; }
+        .footer-col { flex: 1; min-width: 150px; }
+        .footer-col h4 { font-size: 1rem; margin-bottom: 16px; color: #333; }
         .footer-col ul { list-style: none; }
-        .footer-col li { margin-bottom: 10px; }
-        .footer-col a { color: #666; text-decoration: none; }
-        .footer-col a:hover { color: #2c7a4d; }
-        .copyright { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #888; font-size: 0.8rem; }
-        @media (max-width: 768px) { .hero h1 { font-size: 2rem; } .restaurant-grid { grid-template-columns: 1fr; } }
+        .footer-col li { margin-bottom: 8px; }
+        .footer-col a { color: #666; text-decoration: none; font-size: 0.85rem; }
+        .footer-col a:hover { color: #2c7a4d; text-decoration: underline; }
+        .copyright { text-align: center; padding-top: 30px; font-size: 0.75rem; color: #888; border-top: 1px solid #ddd; margin-top: 30px; }
+        @media (max-width: 768px) { .filter-tabs { gap: 8px; } .filter-tab { padding: 4px 12px; font-size: 0.8rem; } }
+        @media (max-width: 600px) { #map { height: 320px; } header { height: 60px; } .logo { height: 40px; } }
+        /* 阿拉伯语从右到左 */
+        .arabic { direction: rtl; font-family: 'Segoe UI', 'Tahoma', sans-serif; }
     </style>
 </head>
 <body>
-<div class="hero">
-    <h1>🍽️ TasteHome</h1>
-    <p>Find your taste of home | 找到你的家乡味</p>
-    <div class="search-bar">
-        <input type="text" id="globalSearch" placeholder="Search for halal restaurants...">
-        <button id="searchBtn">🔍 Search</button>
+
+<header>
+    <div class="logo-container">
+        <img src="logo-simple.png" alt="TasteHome" class="logo">
     </div>
-</div>
-<div class="nav-bar">
-    <img src="logo-simple.png" alt="TasteHome" class="logo-img">
-    <select id="langSelect" class="lang-select">
-        <option value="en">English</option>
-        <option value="zh">中文</option>
-    </select>
-</div>
-<div class="container">
-    <div class="map-section">
-        <h2>📍 Halal Food Map</h2>
-        <div id="map"></div>
-    </div>
-    <div class="filters">
-        <input type="text" id="searchInput" placeholder="Filter by name...">
-        <select id="certFilter">
-            <option value="">All certifications</option>
-            <option value="Muslim-owned">Muslim-owned</option>
-            <option value="Halal Certified">Halal Certified</option>
+    <div class="right-buttons">
+        <select id="langSelect" class="lang-switch">
+            <option value="en">English</option>
+            <option value="zh">中文</option>
+            <option value="ar">العربية</option>
         </select>
+        <button id="userBtn" class="user-btn">Login</button>
     </div>
-    <div id="restaurantGrid" class="restaurant-grid"></div>
-    <div id="unlockBanner" class="unlock-banner" style="display: none;">
-        <h3>🔓 Unlock all 6+ halal restaurants</h3>
-        <p>One-time payment ¥9.9, permanent access</p>
-        <button class="unlock-btn" onclick="showPaymentModal()">Unlock Now →</button>
+</header>
+
+<main>
+    <div id="map"></div>
+
+    <!-- 筛选标签栏 -->
+    <div class="filter-tabs" id="filterTabs">
+        <button class="filter-tab active" data-filter="all">All</button>
+        <button class="filter-tab" data-filter="price">Price</button>
+        <button class="filter-tab" data-filter="open">Open Now</button>
+        <button class="filter-tab" data-filter="reservations">Reservations</button>
     </div>
-</div>
-<!-- 支付弹窗 -->
+
+    <div id="restaurantList"></div>
+    <div id="unlockArea" style="display: none;"></div>
+</main>
+
+<!-- 支付弹窗（手动确认） -->
 <div id="paymentModal" class="modal">
     <div class="modal-content">
-        <h3>Unlock All Restaurants</h3>
-        <p>Pay ¥9.9 to get full access</p>
+        <h3 id="modalTitle">Unlock All Restaurants</h3>
+        <p id="modalDesc">Pay ¥9.9 to get full access</p>
         <div class="qr-box">
+            <div style="font-size: 12px; margin-bottom: 8px;">👇 Scan to pay ¥9.9 👇</div>
             <img src="收款码.png" alt="Payment QR Code">
         </div>
-        <button id="confirmPayBtn" style="background:#2c7a4d; color:white; padding:12px 24px; border:none; border-radius:40px; margin:10px;">I have paid</button>
-        <button id="closePayBtn" style="background:#ccc; padding:12px 24px; border:none; border-radius:40px;">Cancel</button>
+        <button id="confirmPayBtn" style="background:#2c7a4d; color:white; margin: 8px;">✓ I have paid / 我已支付</button>
+        <button id="closeModalBtn" style="background:#ccc;">Cancel</button>
     </div>
 </div>
+
+<!-- 登录/注册弹窗 -->
+<div id="authModal" class="modal">
+    <div class="modal-content">
+        <h3 id="authTitle">Login</h3>
+        <input type="text" id="username" placeholder="Username" style="width:100%; margin:10px 0; padding:10px; border-radius:30px; border:1px solid #ddd;">
+        <input type="password" id="password" placeholder="Password" style="width:100%; margin:10px 0; padding:10px; border-radius:30px; border:1px solid #ddd;">
+        <button id="authSubmitBtn" style="background:#2c7a4d; color:white; padding:8px 20px; border-radius:30px;">Login</button>
+        <button id="closeAuthBtn" style="background:#ccc; margin-top:10px;">Close</button>
+        <p style="margin-top:12px; font-size:0.8rem;">Demo: any username/password</p>
+    </div>
+</div>
+
 <!-- 餐厅详情弹窗 -->
 <div id="detailModal" class="modal">
     <div class="modal-content" id="detailContent"></div>
 </div>
+
+<!-- 底部 -->
 <footer>
     <div class="footer-container">
-        <div class="footer-col"><h4>About TasteHome</h4><ul><li><a href="#">Our Story</a></li><li><a href="#">Team</a></li><li><a href="#">Contact</a></li></ul></div>
-        <div class="footer-col"><h4>Discover</h4><ul><li><a href="#">Halal Restaurants</a></li><li><a href="#">International Cuisine</a></li><li><a href="#">Food Events</a></li></ul></div>
-        <div class="footer-col"><h4>For Business</h4><ul><li><a href="#">List Your Restaurant</a></li><li><a href="#">Advertise</a></li><li><a href="#">Business Login</a></li></ul></div>
+        <div class="footer-col"><h4>About TasteHome</h4><ul><li><a href="#">About Us</a></li><li><a href="#">Team</a></li><li><a href="#">Contact</a></li><li><a href="#">Privacy Policy</a></li><li><a href="#">Terms</a></li></ul></div>
+        <div class="footer-col"><h4>Discover</h4><ul><li><a href="#">Halal Restaurants</a></li><li><a href="#">Indian Cuisine</a></li><li><a href="#">Thai Cuisine</a></li><li><a href="#">Malaysian Cuisine</a></li><li><a href="#">Mexican Cuisine</a></li></ul></div>
+        <div class="footer-col"><h4>For Business</h4><ul><li><a href="#">List Your Restaurant</a></li><li><a href="#">Advertise</a></li><li><a href="#">Coupons</a></li><li><a href="#">Business Login</a></li></ul></div>
         <div class="footer-col"><h4>Support</h4><ul><li><a href="#">Help Center</a></li><li><a href="#">Volunteer</a></li><li><a href="#">Campus Ambassador</a></li></ul></div>
     </div>
-    <div class="copyright">© 2025 TasteHome International Food Map | 让每一位留学生找到家乡味</div>
+    <div class="copyright">© 2025 TasteHome International Food Map | Find your taste of home</div>
 </footer>
+
 <script>
+    // 餐厅数据（6家）
     const restaurantsData = [
-        { id: 1, name_cn: "兰州拉面（仓前店）", name_en: "Lanzhou Noodles", lat: 30.28621, lng: 120.019159, address_cn: "余杭区仓前街道", address_en: "Cangqian Street", certification_cn: "穆斯林经营", certification_en: "Muslim-owned", rating: 4.3, img: "🍜" },
-        { id: 2, name_cn: "疆厨子·抓饭·烤肉", name_en: "Jiang Kitchen", lat: 30.274897, lng: 120.021742, address_cn: "余杭区仓前街道", address_en: "Cangqian Street", certification_cn: "清真认证", certification_en: "Halal Certified", rating: 4.5, img: "🍛" },
-        { id: 3, name_cn: "SOUQ黎巴嫩烤肉", name_en: "SOUQ Lebanese BBQ", lat: 30.251497, lng: 120.212689, address_cn: "平安悦坊", address_en: "Ping'an Yuefang", certification_cn: "清真认证", certification_en: "Halal Certified", rating: 4.4, img: "🍖" },
-        { id: 4, name_cn: "Uncle Kosto中东菜", name_en: "Uncle Kosto", lat: 30.313583, lng: 120.392775, address_cn: "中东菜餐厅", address_en: "Middle Eastern", certification_cn: "穆斯林经营", certification_en: "Muslim-owned", rating: 4.6, img: "🥙" },
-        { id: 5, name_cn: "喀摩尔土耳其餐厅", name_en: "Kamoer Turkish", lat: 30.247915, lng: 120.170652, address_cn: "中山中路", address_en: "Zhongshan Road", certification_cn: "清真认证", certification_en: "Halal Certified", rating: 4.5, img: "🍢" },
-        { id: 6, name_cn: "halal迪拜土耳其餐厅", name_en: "Halal Dubai Turkish", lat: 30.257386, lng: 120.159474, address_cn: "西湖音乐喷泉", address_en: "West Lake", certification_cn: "清真认证", certification_en: "Halal Certified", rating: 4.7, img: "🍗" }
+        { id: 1, name_cn: "兰州拉面（仓前店）", name_en: "Lanzhou Noodles (Cangqian)", name_ar: "لانزو نودلز", lat: 30.28621, lng: 120.019159, address_cn: "余杭区仓前街道", address_en: "Cangqian Street", address_ar: "شارع تشانغتشيان", certification_cn: "穆斯林经营", certification_en: "Muslim-owned", certification_ar: "حلال مملوك للمسلمين", rating: 4.3, price_level: "¥", open_now: true, reservations: false },
+        { id: 2, name_cn: "疆厨子·抓饭·烤肉", name_en: "Jiang Kitchen - Rice & BBQ", name_ar: "مطبخ جيانغ", lat: 30.274897, lng: 120.021742, address_cn: "余杭区仓前街道", address_en: "Cangqian Street", address_ar: "شارع تشانغتشيان", certification_cn: "清真认证", certification_en: "Halal Certified", certification_ar: "حلال معتمد", rating: 4.5, price_level: "¥¥", open_now: true, reservations: true },
+        { id: 3, name_cn: "SOUQ · 黎巴嫩烤肉(平安悦坊店)", name_en: "SOUQ Lebanese BBQ", name_ar: "سوق شواء لبناني", lat: 30.251497, lng: 120.212689, address_cn: "平安悦坊", address_en: "Ping'an Yuefang", address_ar: "بينغ آن يويه فانغ", certification_cn: "清真认证", certification_en: "Halal Certified", certification_ar: "حلال معتمد", rating: 4.4, price_level: "¥¥¥", open_now: false, reservations: true },
+        { id: 4, name_cn: "Uncle Kosto科斯托·中东菜", name_en: "Uncle Kosto Middle Eastern", name_ar: "عم كوستو", lat: 30.313583, lng: 120.392775, address_cn: "中东菜餐厅", address_en: "Middle Eastern Restaurant", address_ar: "مطعم شرق أوسطي", certification_cn: "穆斯林经营", certification_en: "Muslim-owned", certification_ar: "حلال مملوك للمسلمين", rating: 4.6, price_level: "¥¥", open_now: true, reservations: false },
+        { id: 5, name_cn: "喀摩尔土耳其风味餐厅·中东美食·异域风情(中山中路店)", name_en: "Kamoer Turkish Cuisine", name_ar: "كاموير تركي", lat: 30.247915, lng: 120.170652, address_cn: "中山中路", address_en: "Zhongshan Middle Road", address_ar: "طريق تشونغشان الأوسط", certification_cn: "清真认证", certification_en: "Halal Certified", certification_ar: "حلال معتمد", rating: 4.5, price_level: "¥¥¥", open_now: false, reservations: true },
+        { id: 6, name_cn: "halal迪拜土耳其清真餐厅·烧烤.宴会团建(西湖音乐喷泉店)", name_en: "Halal Dubai Turkish BBQ", name_ar: "دبي تركي حلال", lat: 30.257386, lng: 120.159474, address_cn: "西湖音乐喷泉", address_en: "West Lake Music Fountain", address_ar: "نافورة ويست ليك الموسيقية", certification_cn: "清真认证", certification_en: "Halal Certified", certification_ar: "حلال معتمد", rating: 4.7, price_level: "¥¥¥¥", open_now: true, reservations: true }
     ];
+
     let currentLang = 'en';
-    let map, markers = [];
+    let map = null;
+    let markers = [];
     let isPaidUser = localStorage.getItem('tastehome_paid') === 'true';
-    function getRestaurantName(r) { return currentLang === 'zh' ? r.name_cn : r.name_en; }
-    function getAddress(r) { return currentLang === 'zh' ? r.address_cn : r.address_en; }
-    function getCert(r) { return currentLang === 'zh' ? r.certification_cn : r.certification_en; }
-    function displayRestaurants() {
-        const grid = document.getElementById('restaurantGrid');
-        const unlockBanner = document.getElementById('unlockBanner');
-        let filtered = [...restaurantsData];
-        const keyword = document.getElementById('searchInput').value.toLowerCase();
-        if (keyword) filtered = filtered.filter(r => getRestaurantName(r).toLowerCase().includes(keyword));
-        const cert = document.getElementById('certFilter').value;
-        if (cert) filtered = filtered.filter(r => getCert(r) === cert);
-        const displayList = isPaidUser ? filtered : filtered.slice(0, 3);
-        grid.innerHTML = displayList.map(r => `
-            <div class="restaurant-card" onclick="showDetail(${r.id})">
-                <div class="card-img">${r.img}</div>
-                <div class="card-content">
-                    <div class="restaurant-name">${getRestaurantName(r)}</div>
-                    <div class="restaurant-address">📍 ${getAddress(r)}</div>
-                    <div class="restaurant-meta">✅ ${getCert(r)}</div>
-                    <div class="rating">⭐ ${r.rating}</div>
-                </div>
-            </div>
-        `).join('');
-        unlockBanner.style.display = (!isPaidUser && restaurantsData.length > 3) ? 'block' : 'none';
+    let currentUser = localStorage.getItem('tastehome_user') || null;
+    let currentFilter = 'all';
+
+    // 多语言文本
+    const translations = {
+        en: { unlock_btn: "🔓 Unlock All Restaurants (¥9.9)", unlock_title: "Unlock All Restaurants", unlock_desc: "Pay ¥9.9 to get full access", confirm_msg: "✓ Payment confirmed! All restaurants unlocked.", search_placeholder: "Search restaurants...", all: "All", price: "Price", open_now: "Open Now", reservations: "Reservations", nav_btn: "🧭 Navigate", help_btn: "🙋 Ask for Companion", reviews_title: "User Reviews", no_reviews: "No reviews yet. Be the first!", write_review: "Write your review...", submit_review: "Submit Review", rating: "Rating:", close: "Close", login_title: "Login", login_demo: "Demo: any username/password", login_btn: "Login", logout: "Logout" },
+        zh: { unlock_btn: "🔓 解锁全部餐厅 (¥9.9)", unlock_title: "解锁全部餐厅", unlock_desc: "支付 ¥9.9 解锁全部清真餐厅", confirm_msg: "✓ 支付已确认！已解锁全部餐厅。", search_placeholder: "搜索餐厅...", all: "全部", price: "价格", open_now: "营业中", reservations: "可预订", nav_btn: "🧭 导航", help_btn: "🙋 求带", reviews_title: "用户评价", no_reviews: "暂无评价，快来发表第一条吧！", write_review: "写下你的评价...", submit_review: "发表评价", rating: "评分：", close: "关闭", login_title: "登录", login_demo: "演示：任意用户名/密码", login_btn: "登录", logout: "退出" },
+        ar: { unlock_btn: "🔓 فتح جميع المطاعم (¥9.9)", unlock_title: "فتح جميع المطاعم", unlock_desc: "ادفع ¥9.9 للوصول الكامل", confirm_msg: "✓ تم تأكيد الدفع! تم فتح جميع المطاعم.", search_placeholder: "ابحث عن مطعم...", all: "الكل", price: "السعر", open_now: "مفتوح الآن", reservations: "حجز", nav_btn: "🧭 ملاحة", help_btn: "🙋 طلب مرافق", reviews_title: "تقييمات المستخدمين", no_reviews: "لا توجد تقييمات بعد. كن الأول!", write_review: "اكتب تقييمك...", submit_review: "نشر التقييم", rating: "التقييم:", close: "إغلاق", login_title: "تسجيل الدخول", login_demo: "تجريبي: أي اسم مستخدم/كلمة مرور", login_btn: "دخول", logout: "تسجيل خروج" }
+    };
+    function t(key) { return translations[currentLang][key] || key; }
+
+    // 隐藏用户名
+    function maskUsername(name) { return name ? name[0] + '***' : 'Anon'; }
+
+    // 筛选餐厅
+    function filterRestaurants(restaurants) {
+        let filtered = [...restaurants];
+        if (currentFilter === 'price') {
+            // 演示：按价格排序（低到高），简单模拟
+            const priceOrder = { "¥":1, "¥¥":2, "¥¥¥":3, "¥¥¥¥":4 };
+            filtered.sort((a,b) => (priceOrder[a.price_level]||0) - (priceOrder[b.price_level]||0));
+        } else if (currentFilter === 'open') {
+            filtered = filtered.filter(r => r.open_now === true);
+        } else if (currentFilter === 'reservations') {
+            filtered = filtered.filter(r => r.reservations === true);
+        }
+        return filtered;
     }
+
+    function displayRestaurants() {
+        const container = document.getElementById('restaurantList');
+        const unlockContainer = document.getElementById('unlockArea');
+        container.innerHTML = '';
+        let filtered = filterRestaurants(restaurantsData);
+        const displayList = isPaidUser ? filtered : filtered.slice(0, 3);
+        displayList.forEach(rest => {
+            const card = document.createElement('div');
+            card.className = 'restaurant-card';
+            let name, addr, cert;
+            if (currentLang === 'zh') { name = rest.name_cn; addr = rest.address_cn; cert = rest.certification_cn; }
+            else if (currentLang === 'ar') { name = rest.name_ar || rest.name_en; addr = rest.address_ar || rest.address_en; cert = rest.certification_ar || rest.certification_en; }
+            else { name = rest.name_en; addr = rest.address_en; cert = rest.certification_en; }
+            card.innerHTML = `
+                <div class="restaurant-name">${name} ⭐ ${rest.rating}</div>
+                <div class="restaurant-address">📍 ${addr}</div>
+                <div class="restaurant-meta">✅ ${cert}</div>
+            `;
+            card.onclick = () => showRestaurantDetail(rest);
+            container.appendChild(card);
+        });
+        if (!isPaidUser && restaurantsData.length > 3) {
+            unlockContainer.innerHTML = `<button class="unlock-btn" onclick="showPaymentModal()">${t('unlock_btn')}</button>`;
+            unlockContainer.style.display = 'block';
+        } else {
+            unlockContainer.style.display = 'none';
+        }
+    }
+
     function updateMapMarkers() {
         if (!map) return;
         markers.forEach(m => m.setMap(null));
         markers = [];
-        const displayList = isPaidUser ? restaurantsData : restaurantsData.slice(0, 3);
-        displayList.forEach(r => {
-            const marker = new AMap.Marker({ position: [r.lng, r.lat], map: map, title: getRestaurantName(r) });
-            marker.on('click', () => showDetail(r.id));
+        let filtered = filterRestaurants(restaurantsData);
+        const displayList = isPaidUser ? filtered : filtered.slice(0, 3);
+        displayList.forEach(rest => {
+            let title = currentLang === 'zh' ? rest.name_cn : (currentLang === 'ar' ? (rest.name_ar || rest.name_en) : rest.name_en);
+            const marker = new AMap.Marker({
+                position: [rest.lng, rest.lat],
+                map: map,
+                title: title,
+            });
+            marker.on('click', () => showRestaurantDetail(rest));
             markers.push(marker);
         });
         if (markers.length) map.setFitView(markers);
     }
-    async function showDetail(id) {
-        const rest = restaurantsData.find(r => r.id === id);
+
+    async function showRestaurantDetail(rest) {
         const detailContent = document.getElementById('detailContent');
-        detailContent.innerHTML = `<div>Loading reviews...</div>`;
+        detailContent.innerHTML = `<div style="text-align:center">Loading...</div>`;
         document.getElementById('detailModal').style.display = 'flex';
         let reviewsHtml = '';
         if (window.db) {
-            const reviewsRef = collection(window.db, `restaurants/${id}/reviews`);
-            const q = query(reviewsRef, orderBy('createdAt', 'desc'));
-            const snapshot = await getDocs(q);
-            snapshot.forEach(doc => {
-                const rev = doc.data();
-                const stars = '★'.repeat(rev.rating) + '☆'.repeat(5-rev.rating);
-                reviewsHtml += `<div class="review-item"><strong>${rev.userName?.substring(0,1) || 'U'}***</strong> ${stars}<br>${rev.text}<br><small>${new Date(rev.createdAt).toLocaleString()}</small></div>`;
-            });
+            try {
+                const reviewsRef = collection(window.db, `restaurants/${rest.id}/reviews`);
+                const q = query(reviewsRef, orderBy('createdAt', 'desc'));
+                const snapshot = await getDocs(q);
+                snapshot.forEach(doc => {
+                    const rev = doc.data();
+                    const stars = '★'.repeat(rev.rating) + '☆'.repeat(5-rev.rating);
+                    const maskedName = maskUsername(rev.userName);
+                    reviewsHtml += `<div class="review-item"><div class="review-user">${maskedName}</div><div class="review-rating">${stars}</div><div class="review-text">${rev.text}</div><div class="review-time">${new Date(rev.createdAt).toLocaleString()}</div></div>`;
+                });
+            } catch(e) { console.error(e); }
         }
-        if (!reviewsHtml) reviewsHtml = '<p>No reviews yet. Be the first!</p>';
+        if (!reviewsHtml) reviewsHtml = `<p>${t('no_reviews')}</p>`;
+        let name, addr, cert;
+        if (currentLang === 'zh') { name = rest.name_cn; addr = rest.address_cn; cert = rest.certification_cn; }
+        else if (currentLang === 'ar') { name = rest.name_ar || rest.name_en; addr = rest.address_ar || rest.address_en; cert = rest.certification_ar || rest.certification_en; }
+        else { name = rest.name_en; addr = rest.address_en; cert = rest.certification_en; }
         detailContent.innerHTML = `
-            <h2>${getRestaurantName(rest)}</h2>
-            <p>📍 ${getAddress(rest)}</p>
-            <p>✅ ${getCert(rest)}</p>
+            <h3>${name}</h3>
+            <p>📍 ${addr}</p>
+            <p>✅ ${cert}</p>
             <p>⭐ ${rest.rating}</p>
-            <button id="navBtn" style="background:#2c7a4d; color:white; padding:8px 16px; border-radius:30px;">Navigate</button>
+            <button id="navBtn" style="background:#2c7a4d; color:white; margin:5px;">${t('nav_btn')}</button>
+            <button id="helpBtn" style="background:#ffc107; margin:5px;">${t('help_btn')}</button>
             <hr>
-            <h3>Reviews</h3>
+            <h4>📝 ${t('reviews_title')}</h4>
             <div id="reviewsList">${reviewsHtml}</div>
-            <textarea id="newReview" rows="2" placeholder="Write your review..." style="width:100%; margin:10px 0; padding:8px;"></textarea>
-            <select id="reviewRating"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select>
-            <button id="submitReviewBtn" style="background:#2c7a4d; color:white; margin:10px;">Submit</button>
-            <button id="closeDetail" style="background:#ccc;">Close</button>
+            <div style="margin-top:16px;">
+                <textarea id="newReview" rows="2" placeholder="${t('write_review')}" style="width:100%; padding:8px; border-radius:12px; border:1px solid #ddd;"></textarea>
+                <div style="margin:8px 0;"><span>${t('rating')}</span> <select id="reviewRating"><option value="5">⭐⭐⭐⭐⭐ 5</option><option value="4">⭐⭐⭐⭐ 4</option><option value="3">⭐⭐⭐ 3</option><option value="2">⭐⭐ 2</option><option value="1">⭐ 1</option></select></div>
+                <button id="submitReviewBtn" style="background:#2c7a4d; color:white;">${t('submit_review')}</button>
+            </div>
+            <button id="closeDetail" style="background:#ccc; margin-top:16px;">${t('close')}</button>
         `;
         document.getElementById('navBtn').onclick = () => window.open(`https://uri.amap.com/marker?position=${rest.lng},${rest.lat}&name=${encodeURIComponent(rest.name_cn)}`);
+        document.getElementById('helpBtn').onclick = () => alert(t('help_btn') + ' - Coming soon');
         document.getElementById('submitReviewBtn').onclick = async () => {
             const text = document.getElementById('newReview').value.trim();
             const rating = parseInt(document.getElementById('reviewRating').value);
-            if (!text) return;
-            const userId = localStorage.getItem('userId') || 'user_' + Math.random().toString(36).substr(2,6);
-            if (!localStorage.getItem('userId')) localStorage.setItem('userId', userId);
-            const userName = 'User_' + userId.substr(-4);
-            await addDoc(collection(window.db, `restaurants/${id}/reviews`), { text, rating, userName, createdAt: new Date() });
+            if (!text) { alert('Please write something'); return; }
+            if (!window.db) { alert('Review system not available'); return; }
+            const userName = currentUser || 'Guest_' + Math.random().toString(36).substr(2, 6);
+            await addDoc(collection(window.db, `restaurants/${rest.id}/reviews`), {
+                text, rating, userName, createdAt: new Date()
+            });
             alert('Review submitted!');
-            showDetail(id);
+            showRestaurantDetail(rest);
         };
         document.getElementById('closeDetail').onclick = () => document.getElementById('detailModal').style.display = 'none';
     }
+
+    // 支付
     function showPaymentModal() { document.getElementById('paymentModal').style.display = 'flex'; }
-    function confirmPayment() { isPaidUser = true; localStorage.setItem('tastehome_paid', 'true'); document.getElementById('paymentModal').style.display = 'none'; displayRestaurants(); updateMapMarkers(); alert('Payment confirmed! All restaurants unlocked.'); }
+    function closePaymentModal() { document.getElementById('paymentModal').style.display = 'none'; }
+    function confirmPayment() {
+        isPaidUser = true;
+        localStorage.setItem('tastehome_paid', 'true');
+        closePaymentModal();
+        displayRestaurants();
+        updateMapMarkers();
+        alert(t('confirm_msg'));
+    }
+
+    // 登录/注册
+    function showAuthModal() { document.getElementById('authModal').style.display = 'flex'; }
+    function closeAuthModal() { document.getElementById('authModal').style.display = 'none'; }
+    function handleLogin() {
+        const username = document.getElementById('username').value.trim();
+        if (!username) { alert('Please enter username'); return; }
+        currentUser = username;
+        localStorage.setItem('tastehome_user', username);
+        document.getElementById('userBtn').innerText = currentUser;
+        closeAuthModal();
+        alert(`Welcome ${currentUser}!`);
+    }
+    function logout() {
+        currentUser = null;
+        localStorage.removeItem('tastehome_user');
+        document.getElementById('userBtn').innerText = t('login_btn');
+    }
+
+    // 初始化地图
     function initMap() {
-        map = new AMap.Map('map', { center: [120.016255, 30.292797], zoom: 13, viewMode: '2D', mapStyle: 'amap://styles/whitesmoke' });
-        map.addControl(new AMap.Scale()); map.addControl(new AMap.ToolBar());
+        map = new AMap.Map('map', {
+            center: [120.016255, 30.292797],
+            zoom: 13,
+            viewMode: '2D',
+            mapStyle: 'amap://styles/whitesmoke'
+        });
+        map.addControl(new AMap.Scale());
+        map.addControl(new AMap.ToolBar());
         updateMapMarkers();
     }
-    function setLanguage(lang) { currentLang = lang; displayRestaurants(); updateMapMarkers(); }
+
+    // 切换语言
+    function setLanguage(lang) {
+        currentLang = lang;
+        localStorage.setItem('tastehome_lang', lang);
+        document.getElementById('langSelect').value = lang;
+        // 更新所有文字
+        document.getElementById('userBtn').innerText = currentUser ? currentUser : t('login_btn');
+        document.getElementById('modalTitle').innerText = t('unlock_title');
+        document.getElementById('modalDesc').innerText = t('unlock_desc');
+        document.getElementById('authTitle').innerText = t('login_title');
+        document.getElementById('authSubmitBtn').innerText = t('login_btn');
+        // 更新筛选标签文字
+        const tabs = document.querySelectorAll('.filter-tab');
+        if (tabs.length >= 4) {
+            tabs[0].innerText = t('all');
+            tabs[1].innerText = t('price');
+            tabs[2].innerText = t('open_now');
+            tabs[3].innerText = t('reservations');
+        }
+        displayRestaurants();
+        updateMapMarkers();
+        // 阿拉伯语方向
+        if (currentLang === 'ar') document.body.classList.add('arabic');
+        else document.body.classList.remove('arabic');
+    }
+
+    // 页面加载
     window.onload = () => {
-        initMap(); displayRestaurants();
-        document.getElementById('langSelect').value = currentLang;
+        const savedLang = localStorage.getItem('tastehome_lang') || 'en';
+        setLanguage(savedLang);
+        initMap();
+        // 筛选标签点击
+        document.querySelectorAll('.filter-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentFilter = tab.getAttribute('data-filter');
+                displayRestaurants();
+                updateMapMarkers();
+            });
+        });
+        // 事件绑定
         document.getElementById('langSelect').onchange = (e) => setLanguage(e.target.value);
-        document.getElementById('searchInput').oninput = () => displayRestaurants();
-        document.getElementById('certFilter').onchange = () => displayRestaurants();
+        document.getElementById('userBtn').onclick = () => currentUser ? logout() : showAuthModal();
         document.getElementById('confirmPayBtn').onclick = confirmPayment;
-        document.getElementById('closePayBtn').onclick = () => document.getElementById('paymentModal').style.display = 'none';
-        document.getElementById('globalSearch').onkeypress = (e) => { if(e.key === 'Enter') document.getElementById('searchBtn').click(); };
-        document.getElementById('searchBtn').onclick = () => { const kw = document.getElementById('globalSearch').value; document.getElementById('searchInput').value = kw; displayRestaurants(); };
+        document.getElementById('closeModalBtn').onclick = closePaymentModal;
+        document.getElementById('authSubmitBtn').onclick = handleLogin;
+        document.getElementById('closeAuthBtn').onclick = closeAuthModal;
+        window.showPaymentModal = showPaymentModal;
     };
-    window.showPaymentModal = showPaymentModal;
 </script>
 </body>
 </html>
